@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package compute
+package stringutils2
 
-const (
-	SECGROUP_CACHE_STATUS_READY         = "ready"
-	SECGROUP_CACHE_STATUS_UNKNOWN       = "unknown"
-	SECGROUP_CACHE_STATUS_DELETING      = "deleting"
-	SECGROUP_CACHE_STATUS_CACHING       = "caching"
-	SECGROUP_CACHE_STATUS_CACHE_FAILED  = "cache_failed"
-	SECGROUP_CACHE_STATUS_DELETE_FAILED = "delete_failed"
+import (
+	"crypto/sha256"
+	"fmt"
 )
+
+func GenId(ids ...string) string {
+	h := sha256.New()
+	for _, id := range ids {
+		h.Write([]byte(id))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}

@@ -17,10 +17,12 @@ package models
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
 
+	"yunion.io/x/cloudmux/pkg/cloudprovider"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
 	"yunion.io/x/pkg/errors"
@@ -159,10 +161,32 @@ func (guest *SGuest) sshableTryEach(
 	}
 
 	//   - check eip
-	if eip, err := guest.GetEipOrPublicIp(); err == nil && eip != nil {
-		if ok := guest.sshableTryEip(ctx, tryData, eip); ok {
-			return nil
+	vpc, err := guest.GetVpc()
+	if err != nil {
+		return err
+	}
+	metadata, err := vpc.GetAllCloudMetadata()
+	if err != nil {
+		return err
+	}
+	isPublicNetwork := false
+	if str, exist := metadata["IsPublicNetwork"]; exist {
+		isPublicNetwork, _ = strconv.ParseBool(str)
+	}
+	if !isPublicNetwork {
+		if eip, err := guest.GetEipOrPublicIp(); err == nil && eip != nil {
+			if ok := guest.sshableTryEip(ctx, tryData, eip); ok {
+				return nil
+			}
 		}
+	} else {
+		q := guest.GetNetworksQuery("")
+		guestnic := &SGuestnetwork{}
+		err := q.First(guestnic)
+		if err != nil {
+			return errors.Wrapf(err, "failed getting guest network of %s(%s)", guest.Name, guest.Id)
+		}
+		guest.sshableTryNetwork(ctx, tryData, guestnic)
 	}
 
 	sess := auth.GetSession(ctx, userCred, "")
@@ -325,6 +349,21 @@ func (guest *SGuest) sshableTryEip(
 	)
 }
 
+func (guest *SGuest) sshableTryNetwork(
+	ctx context.Context,
+	tryData *GuestSshableTryData,
+	network *SGuestnetwork,
+) bool {
+	methodData := compute_api.GuestSshableMethodData{
+		Method: compute_api.MethodDirect,
+		Host:   network.IpAddr,
+		Port:   tryData.Port,
+	}
+	return guest.sshableTry(
+		ctx, tryData, methodData,
+	)
+}
+
 func (guest *SGuest) sshableTryDefaultVPC(
 	ctx context.Context,
 	tryData *GuestSshableTryData,
@@ -430,9 +469,28 @@ func (guest *SGuest) PerformMakeSshable(
 	host := ansible.Host{
 		Name: guest.Name,
 	}
+
+	tryHost := tryData.MethodTried[0].Host
+	tryPort := tryData.MethodTried[0].Port
+	err = cloudprovider.Wait(time.Second*5, time.Minute*2, func() (bool, error) {
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(tryHost, fmt.Sprintf("%d", tryPort)), time.Second)
+		if err != nil {
+			return false, err
+		}
+		if conn != nil {
+			conn.Close()
+			log.Infof("connect to guest %s port %s.", tryHost, tryPort)
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return output, httperrors.NewInternalServerError("cannot connect to guest %s port %s.", tryHost, tryPort)
+	}
+
 	host.SetVar("ansible_user", input.User)
-	host.SetVar("ansible_host", tryData.MethodTried[0].Host)
-	host.SetVar("ansible_port", fmt.Sprintf("%d", tryData.MethodTried[0].Port))
+	host.SetVar("ansible_host", tryHost)
+	host.SetVar("ansible_port", fmt.Sprintf("%d", tryPort))
 	host.SetVar("ansible_become", "yes")
 	pb := &ansible.Playbook{
 		Inventory: ansible.Inventory{

@@ -40,7 +40,6 @@ func InitDB() error {
 		WireManager,
 		StorageManager,
 		SecurityGroupManager,
-		SecurityGroupCacheManager,
 		NetworkManager,
 		NetworkAddressManager,
 		NetworkIpMacManager,
@@ -61,6 +60,7 @@ func InitDB() error {
 		ElasticcacheSkuManager,
 
 		ExternalProjectManager,
+		ExternalMachineManager,
 		CachedimageManager,
 		StoragecachedimageManager,
 		NetworkinterfacenetworkManager,
@@ -73,6 +73,8 @@ func InitDB() error {
 		AccessGroupRuleManager,
 
 		GroupnetworkManager,
+
+		ElasticcacheManager,
 	} {
 		err := manager.InitializeData()
 		if err != nil {

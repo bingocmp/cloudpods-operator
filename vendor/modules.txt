@@ -843,7 +843,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.2.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# yunion.io/x/cloudmux v0.3.10-0-alpha.1.0.20231007091338-25eba853c185
+# yunion.io/x/cloudmux v0.3.10-0-alpha.1.0.20231120065018-41aec345dfbe => /home/ericlee/Projects/bingo-stack/yunion/cloudmux
 ## explicit; go 1.18
 yunion.io/x/cloudmux/pkg/apis
 yunion.io/x/cloudmux/pkg/apis/billing
@@ -864,7 +864,7 @@ yunion.io/x/jsonutils
 ## explicit; go 1.12
 yunion.io/x/log
 yunion.io/x/log/hooks
-# yunion.io/x/onecloud v0.0.0-20231007095621-93d801097dde
+# yunion.io/x/onecloud v0.0.0-20231007095621-93d801097dde => /home/ericlee/Projects/bingo-stack/yunion/cloudpods
 ## explicit; go 1.18
 yunion.io/x/onecloud/cmd/climc/shell
 yunion.io/x/onecloud/locales
@@ -906,6 +906,7 @@ yunion.io/x/onecloud/pkg/cloudcommon/pending_delete
 yunion.io/x/onecloud/pkg/cloudcommon/policy
 yunion.io/x/onecloud/pkg/cloudcommon/syncman
 yunion.io/x/onecloud/pkg/cloudcommon/syncman/watcher
+yunion.io/x/onecloud/pkg/cloudcommon/tsdb
 yunion.io/x/onecloud/pkg/cloudcommon/types
 yunion.io/x/onecloud/pkg/cloudcommon/userdata
 yunion.io/x/onecloud/pkg/cloudcommon/validators
@@ -923,6 +924,7 @@ yunion.io/x/onecloud/pkg/compute/options
 yunion.io/x/onecloud/pkg/compute/sshkeys
 yunion.io/x/onecloud/pkg/devtool/utils
 yunion.io/x/onecloud/pkg/esxi/options
+yunion.io/x/onecloud/pkg/generalservice/options
 yunion.io/x/onecloud/pkg/hostman/guestfs/fsdriver
 yunion.io/x/onecloud/pkg/hostman/guestman/desc
 yunion.io/x/onecloud/pkg/hostman/hostdeployer/apis
@@ -1010,7 +1012,7 @@ yunion.io/x/onecloud/pkg/util/yunionmeta
 yunion.io/x/onecloud/pkg/vpcagent/options
 yunion.io/x/onecloud/pkg/webconsole/options
 yunion.io/x/onecloud/pkg/yunionconf/options
-# yunion.io/x/pkg v1.0.1-0.20230912084455-1393f31347db
+# yunion.io/x/pkg v1.0.1-0.20231101105448-abef64cdc142
 ## explicit; go 1.18
 yunion.io/x/pkg/appctx
 yunion.io/x/pkg/errors
@@ -1057,14 +1059,16 @@ yunion.io/x/pkg/utils
 # yunion.io/x/s3cli v0.0.0-20190917004522-13ac36d8687e
 ## explicit; go 1.12
 yunion.io/x/s3cli
-# yunion.io/x/sqlchemy v1.1.2-0.20231007084448-f8ee76b8ed79
+# yunion.io/x/sqlchemy v1.1.2-0.20231017172907-561e7f013926
 ## explicit; go 1.17
 yunion.io/x/sqlchemy
 yunion.io/x/sqlchemy/backends/clickhouse
-# yunion.io/x/structarg v0.0.0-20220312084958-9c6c79c7d1c6
+# yunion.io/x/structarg v0.0.0-20231017124457-df4d5009457c
 ## explicit; go 1.12
 yunion.io/x/structarg
 # github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 # github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 # github.com/jaypipes/ghw => github.com/zexi/ghw v0.9.1
 # github.com/ugorji/go => github.com/ugorji/go v0.0.0-20181204163529-d75b2dcb6bc8
+# yunion.io/x/cloudmux => /home/ericlee/Projects/bingo-stack/yunion/cloudmux
+# yunion.io/x/onecloud => /home/ericlee/Projects/bingo-stack/yunion/cloudpods

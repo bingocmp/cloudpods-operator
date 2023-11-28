@@ -439,6 +439,8 @@ func (self *SModelartsPool) SyncWithCloudModelartsPool(ctx context.Context, user
 	}
 	diff, err := db.UpdateWithLock(ctx, self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName

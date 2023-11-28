@@ -24,6 +24,7 @@ import (
 	"yunion.io/x/cloudmux/pkg/cloudprovider"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/compute/options"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/util/billing"
 	"yunion.io/x/pkg/util/compare"
@@ -42,7 +43,6 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/notifyclient"
 	"yunion.io/x/onecloud/pkg/cloudcommon/policy"
 	"yunion.io/x/onecloud/pkg/cloudcommon/validators"
-	"yunion.io/x/onecloud/pkg/compute/options"
 	"yunion.io/x/onecloud/pkg/httperrors"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/util/rbacutils"
@@ -1119,10 +1119,14 @@ func (region *SCloudregion) newFromCloudLoadbalancer(ctx context.Context, userCr
 		lockman.LockRawObject(ctx, LoadbalancerManager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, LoadbalancerManager.Keyword(), "name")
 
-		var err error
-		lb.Name, err = db.GenerateName(ctx, LoadbalancerManager, syncOwnerId, ext.GetName())
-		if err != nil {
-			return err
+		if options.Options.EnableSyncName {
+			lb.Name = ext.GetName()
+		} else {
+			newName, err := db.GenerateName(ctx, LoadbalancerManager, syncOwnerId, ext.GetName())
+			if err != nil {
+				return err
+			}
+			lb.Name = newName
 		}
 
 		return LoadbalancerManager.TableSpec().Insert(ctx, &lb)
@@ -1308,12 +1312,14 @@ func (lb *SLoadbalancer) syncWithCloudLoadbalancer(ctx context.Context, userCred
 
 	diff, err := db.Update(lb, func() error {
 		if options.Options.EnableSyncName {
+			lb.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(lb, ext.GetName())
 			if len(newName) > 0 {
 				lb.Name = newName
 			}
 		}
-
+		lb.ExternalId = ext.GetGlobalId()
 		lb.Address = ext.GetAddress()
 		lb.AddressType = ext.GetAddressType()
 		lb.Status = ext.GetStatus()
@@ -1322,6 +1328,13 @@ func (lb *SLoadbalancer) syncWithCloudLoadbalancer(ctx context.Context, userCred
 		lb.ChargeType = ext.GetChargeType()
 		lbNetworkIds := getExtLbNetworkIds(ext, lb.ManagerId)
 		lb.NetworkId = strings.Join(lbNetworkIds, ",")
+
+		if vpcId := ext.GetVpcId(); len(vpcId) > 0 {
+			if vpc, err := db.FetchByExternalId(VpcManager, vpcId); err == nil && vpc != nil {
+				lb.VpcId = vpc.GetId()
+			}
+		}
+
 		if ext.GetSysTags() != nil {
 			lb.LBInfo = jsonutils.Marshal(ext.GetSysTags())
 		}

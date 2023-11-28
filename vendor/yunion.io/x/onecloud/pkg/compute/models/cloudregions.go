@@ -172,6 +172,29 @@ func (self *SCloudregion) GetGuestCount() (int, error) {
 	return self.getGuestCountInternal(false)
 }
 
+func (self *SCloudregion) GetManagedGuestsQuery(managerId string) *sqlchemy.SQuery {
+	q := GuestManager.Query().IsNotEmpty("external_id")
+	hosts := HostManager.Query().Equals("manager_id", managerId).SubQuery()
+	zones := ZoneManager.Query().Equals("cloudregion_id", self.Id).SubQuery()
+	q = q.Join(hosts, sqlchemy.Equals(q.Field("host_id"), hosts.Field("id")))
+	q = q.Join(zones, sqlchemy.Equals(hosts.Field("zone_id"), zones.Field("id")))
+	return q
+}
+
+func (self *SCloudregion) GetManagedGuests(managerId string) ([]SGuest, error) {
+	q := self.GetManagedGuestsQuery(managerId)
+	ret := []SGuest{}
+	err := db.FetchModelObjects(GuestManager, q, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (self *SCloudregion) GetManagedGuestsCount(managerId string) (int, error) {
+	return self.GetManagedGuestsQuery(managerId).CountWithError()
+}
+
 func (self *SCloudregion) GetGuestIncrementCount() (int, error) {
 	return self.getGuestCountInternal(true)
 }
@@ -217,19 +240,14 @@ func (self *SCloudregion) GetDBInstanceBackups(provider *SCloudprovider, instanc
 
 func (self *SCloudregion) GetElasticcaches(provider *SCloudprovider) ([]SElasticcache, error) {
 	instances := []SElasticcache{}
-	// .IsFalse("pending_deleted")
-	vpcs := VpcManager.Query().SubQuery()
-	q := ElasticcacheManager.Query()
-	q = q.Join(vpcs, sqlchemy.Equals(q.Field("vpc_id"), vpcs.Field("id")))
-	q = q.Filter(sqlchemy.Equals(vpcs.Field("cloudregion_id"), self.Id))
+	q := ElasticcacheManager.Query().Equals("cloudregion_id", self.Id)
 	if provider != nil {
-		q = q.Filter(sqlchemy.Equals(vpcs.Field("manager_id"), provider.Id))
+		q = q.Equals("manager_id", provider.Id)
 	}
 	err := db.FetchModelObjects(ElasticcacheManager, q, &instances)
 	if err != nil {
 		return nil, errors.Wrapf(err, "GetElasticcaches for region %s", self.Id)
 	}
-
 	return instances, nil
 }
 
@@ -619,9 +637,13 @@ func (manager *SCloudregionManager) newFromCloudRegion(ctx context.Context, user
 		lockman.LockRawObject(ctx, manager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, manager.Keyword(), "name")
 
-		region.Name, err = db.GenerateName(ctx, manager, nil, cloudRegion.GetName())
-		if err != nil {
-			return errors.Wrapf(err, "db.GenerateName")
+		if options.Options.EnableSyncName {
+			region.Name = cloudRegion.GetName()
+		} else {
+			region.Name, err = db.GenerateName(ctx, manager, nil, cloudRegion.GetName())
+			if err != nil {
+				return errors.Wrapf(err, "db.GenerateName")
+			}
 		}
 
 		return manager.TableSpec().Insert(ctx, &region)

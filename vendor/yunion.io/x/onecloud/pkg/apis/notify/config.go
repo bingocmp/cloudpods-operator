@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"yunion.io/x/jsonutils"
+	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/pkg/gotypes"
 
 	"yunion.io/x/onecloud/pkg/apis"
@@ -168,6 +169,7 @@ type SendParams struct {
 	// minutes
 	GroupTimes uint
 	ReceiverId string
+	UserCred   mcclient.TokenCredential
 }
 
 type SRemoteTemplateParam struct {

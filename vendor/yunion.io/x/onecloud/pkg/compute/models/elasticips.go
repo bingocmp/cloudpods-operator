@@ -23,6 +23,7 @@ import (
 	"yunion.io/x/cloudmux/pkg/cloudprovider"
 	"yunion.io/x/jsonutils"
 	"yunion.io/x/log"
+	"yunion.io/x/onecloud/pkg/compute/options"
 	"yunion.io/x/pkg/errors"
 	"yunion.io/x/pkg/gotypes"
 	"yunion.io/x/pkg/tristate"
@@ -42,7 +43,6 @@ import (
 	"yunion.io/x/onecloud/pkg/cloudcommon/notifyclient"
 	"yunion.io/x/onecloud/pkg/cloudcommon/policy"
 	"yunion.io/x/onecloud/pkg/cloudcommon/validators"
-	"yunion.io/x/onecloud/pkg/compute/options"
 	"yunion.io/x/onecloud/pkg/httperrors"
 	"yunion.io/x/onecloud/pkg/mcclient"
 	"yunion.io/x/onecloud/pkg/util/rbacutils"
@@ -159,7 +159,7 @@ func (manager *SElasticipManager) ListItemFilter(
 			}
 			guest := serverObj.(*SGuest)
 			if guest.Hypervisor == api.HYPERVISOR_KVM || (utils.IsInStringArray(guest.Hypervisor, api.PRIVATE_CLOUD_HYPERVISORS) &&
-				guest.Hypervisor != api.HYPERVISOR_HCSO && guest.Hypervisor != api.HYPERVISOR_HCS) {
+				guest.Hypervisor != api.HYPERVISOR_HCSO && guest.Hypervisor != api.HYPERVISOR_HCS && guest.Hypervisor != api.HYPERVISOR_BINGO_CLOUD) {
 				zone, _ := guest.getZone()
 				networks := NetworkManager.Query().SubQuery()
 				wires := WireManager.Query().SubQuery()
@@ -626,11 +626,15 @@ func (manager *SElasticipManager) newFromCloudEip(ctx context.Context, userCred 
 		lockman.LockRawObject(ctx, manager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, manager.Keyword(), "name")
 
-		newName, err := db.GenerateName(ctx, manager, syncOwnerId, extEip.GetName())
-		if err != nil {
-			return err
+		if options.Options.EnableSyncName {
+			eip.Name = extEip.GetName()
+		} else {
+			newName, err := db.GenerateName(ctx, manager, provider.GetOwnerId(), extEip.GetName())
+			if err != nil {
+				return err
+			}
+			eip.Name = newName
 		}
-		eip.Name = newName
 
 		return manager.TableSpec().Insert(ctx, &eip)
 	}()

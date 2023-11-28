@@ -14,18 +14,15 @@
 
 package compute
 
-import "yunion.io/x/onecloud/pkg/apis"
+// Rescue constants are used for rescue mode
+const (
+	GUEST_RESCUE_RELATIVE_PATH = "rescue" //  serverxxx/rescue
 
-type SecurityGroupCacheDetails struct {
-	apis.StatusStandaloneResourceDetails
-	apis.ProjectizedResourceInfo
-	ManagedResourceInfo
-	CloudregionResourceInfo
+	GUEST_RESCUE_INITRAMFS       = "initramfs"
+	GUEST_RESCUE_KERNEL          = "kernel"
+	GUEST_RESCUE_INITRAMFS_ARM64 = "initramfs_aarch64"
+	GUEST_RESCUE_KERNEL_ARM64    = "kernel_aarch64"
 
-	SSecurityGroupCache
-
-	// 虚拟私有网络名称
-	Vpc string `json:"vpc"`
-
-	ProjectId string `json:"tenant_id"`
-}
+	GUEST_RESCUE_SYS_DISK_NAME = "sys_img"
+	GUEST_RESCUE_SYS_DISK_SIZE = 500 // MB
+)

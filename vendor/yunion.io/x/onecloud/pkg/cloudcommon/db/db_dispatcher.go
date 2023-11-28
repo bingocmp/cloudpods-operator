@@ -1279,7 +1279,7 @@ func _doCreateItem(
 	}
 
 	// 若manager用于name字段，确保name唯一
-	if manager.HasName() {
+	if manager.HasName() && !manager.AllowDuplicateName() {
 		// run name validation after validate create data
 		uniqValues := manager.FetchUniqValues(ctx, dataDict)
 		name, _ := dataDict.GetString("name")

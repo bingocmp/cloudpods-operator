@@ -388,11 +388,15 @@ func (manager *SZoneManager) newFromCloudZone(ctx context.Context, userCred mccl
 		lockman.LockRawObject(ctx, manager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, manager.Keyword(), "name")
 
-		newName, err := db.GenerateName(ctx, manager, userCred, extZone.GetName())
-		if err != nil {
-			return err
+		if options.Options.EnableSyncName {
+			zone.Name = extZone.GetName()
+		} else {
+			newName, err := db.GenerateName(ctx, manager, userCred, extZone.GetName())
+			if err != nil {
+				return err
+			}
+			zone.Name = newName
 		}
-		zone.Name = newName
 
 		return manager.TableSpec().Insert(ctx, &zone)
 	}()

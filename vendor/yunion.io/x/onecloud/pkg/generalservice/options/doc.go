@@ -12,23 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package compute
-
-import (
-	"yunion.io/x/onecloud/pkg/mcclient/modulebase"
-	"yunion.io/x/onecloud/pkg/mcclient/modules"
-)
-
-var (
-	SecGroupCaches modulebase.ResourceManager
-)
-
-func init() {
-	SecGroupCaches = modules.NewComputeManager("secgroupcache", "secgroupcaches",
-		[]string{"ID", "Name", "Descritpion", "Status",
-			"Vpc_Id", "Vpc", "Region", "Account",
-			"Secgroup_Id"},
-		[]string{""})
-
-	modules.RegisterCompute(&SecGroupCaches)
-}
+package options // import "yunion.io/x/onecloud/pkg/generalservice/options"

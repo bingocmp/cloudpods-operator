@@ -349,11 +349,11 @@ func (svpc *SVpc) GetRouteTableCount() (int, error) {
 	return svpc.GetRouteTableQuery().CountWithError()
 }
 
-func (svpc *SVpc) getCloudProviderInfo() SCloudProviderInfo {
+/*func (svpc *SVpc) getCloudProviderInfo() SCloudProviderInfo {
 	region, _ := svpc.GetRegion()
 	provider := svpc.GetCloudprovider()
 	return MakeCloudProviderInfo(region, nil, provider)
-}
+}*/
 
 func (svpc *SVpc) GetRegion() (*SCloudregion, error) {
 	region, err := CloudregionManager.FetchById(svpc.CloudregionId)
@@ -620,6 +620,8 @@ func (svpc *SVpc) syncRemoveCloudVpc(ctx context.Context, userCred mcclient.Toke
 func (svpc *SVpc) SyncWithCloudVpc(ctx context.Context, userCred mcclient.TokenCredential, extVPC cloudprovider.ICloudVpc, provider *SCloudprovider) error {
 	diff, err := db.UpdateWithLock(ctx, svpc, func() error {
 		if options.Options.EnableSyncName {
+			svpc.Name = extVPC.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(svpc, extVPC.GetName())
 			if len(newName) > 0 {
 				svpc.Name = newName
@@ -700,11 +702,15 @@ func (manager *SVpcManager) newFromCloudVpc(ctx context.Context, userCred mcclie
 		lockman.LockRawObject(ctx, manager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, manager.Keyword(), "name")
 
-		newName, err := db.GenerateName(ctx, manager, userCred, extVPC.GetName())
-		if err != nil {
-			return err
+		if options.Options.EnableSyncName {
+			vpc.Name = extVPC.GetName()
+		} else {
+			newName, err := db.GenerateName(ctx, manager, userCred, extVPC.GetName())
+			if err != nil {
+				return err
+			}
+			vpc.Name = newName
 		}
-		vpc.Name = newName
 
 		return manager.TableSpec().Insert(ctx, &vpc)
 	}()
@@ -868,7 +874,8 @@ func (manager *SVpcManager) ValidateCreateData(
 	}
 	region := regionObj.(*SCloudregion)
 	if region.isManaged() {
-		if len(region.ManagerId) > 0 {
+		// 不指定云订阅就使用region的
+		if len(region.ManagerId) > 0 && len(input.CloudproviderId) == 0 {
 			input.CloudproviderId = region.ManagerId
 		}
 		_, err := validators.ValidateModel(userCred, CloudproviderManager, &input.CloudproviderId)
@@ -1375,6 +1382,8 @@ func (svpc *SVpc) initWire(ctx context.Context, zone *SZone, externalId string) 
 	wire.IsPublic = svpc.IsPublic
 	wire.PublicScope = svpc.PublicScope
 
+	wire.ManagerId = svpc.ManagerId
+
 	wire.SetModelManager(WireManager, wire)
 	err := WireManager.TableSpec().Insert(ctx, wire)
 	if err != nil {
@@ -1782,10 +1791,14 @@ func (svpc *SVpc) newFromCloudPeerConnection(ctx context.Context, userCred mccli
 		lockman.LockClass(ctx, VpcPeeringConnectionManager, "name")
 		defer lockman.ReleaseClass(ctx, VpcPeeringConnectionManager, "name")
 
-		var err error
-		peer.Name, err = db.GenerateName(ctx, VpcPeeringConnectionManager, provider.GetOwnerId(), ext.GetName())
-		if err != nil {
-			return errors.Wrapf(err, "db.GenerateName")
+		if options.Options.EnableSyncName {
+			peer.Name = ext.GetName()
+		} else {
+			var err error
+			peer.Name, err = db.GenerateName(ctx, VpcPeeringConnectionManager, provider.GetOwnerId(), ext.GetName())
+			if err != nil {
+				return errors.Wrapf(err, "db.GenerateName")
+			}
 		}
 
 		return VpcPeeringConnectionManager.TableSpec().Insert(ctx, peer)
@@ -1899,6 +1912,65 @@ func (svpc *SVpc) GetDetailsTopology(ctx context.Context, userCred mcclient.Toke
 			wire.Networks = append(wire.Networks, network)
 		}
 		ret.Wires = append(ret.Wires, wire)
+	}
+	return ret, nil
+}
+
+func (self *SVpc) CheckSecurityGroupConsistent(secgroup *SSecurityGroup) error {
+	if secgroup.Status != api.SECGROUP_STATUS_READY {
+		return httperrors.NewInvalidStatusError("security group %s status is not ready", secgroup.Name)
+	}
+	if len(secgroup.ExternalId) == 0 {
+		return httperrors.NewInvalidStatusError("The security group %s does not have an external id", secgroup.Name)
+	}
+	if len(secgroup.VpcId) > 0 {
+		if secgroup.VpcId != self.Id {
+			return httperrors.NewInvalidStatusError("The security group does not belong to the vpc")
+		}
+	} else if len(secgroup.CloudregionId) > 0 {
+		if secgroup.CloudregionId != self.CloudregionId {
+			return httperrors.NewInvalidStatusError("The security group and vpc are in different areas")
+		}
+	} else if len(secgroup.GlobalvpcId) > 0 {
+		if secgroup.GlobalvpcId != self.GlobalvpcId {
+			return httperrors.NewInvalidStatusError("The security group and vpc are in different global vpc")
+		}
+	}
+	return nil
+}
+
+func (self *SVpc) GetSecurityGroups() ([]SSecurityGroup, error) {
+	q := SecurityGroupManager.Query().Equals("vpc_id", self.Id)
+	ret := []SSecurityGroup{}
+	err := db.FetchModelObjects(SecurityGroupManager, q, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func (self *SVpc) GetDefaultSecurityGroup(ownerId mcclient.IIdentityProvider, filter func(q *sqlchemy.SQuery) *sqlchemy.SQuery) (*SSecurityGroup, error) {
+	q := SecurityGroupManager.Query().Equals("status", api.SECGROUP_STATUS_READY).Like("name", "default%")
+
+	q = filter(q)
+	q = q.Filter(
+		sqlchemy.OR(
+			sqlchemy.AND(
+				sqlchemy.Equals(q.Field("public_scope"), "system"),
+				sqlchemy.Equals(q.Field("is_public"), true),
+			),
+			sqlchemy.AND(
+				sqlchemy.Equals(q.Field("tenant_id"), ownerId.GetProjectId()),
+				sqlchemy.Equals(q.Field("domain_id"), ownerId.GetProjectDomainId()),
+			),
+		),
+	)
+
+	ret := &SSecurityGroup{}
+	ret.SetModelManager(SecurityGroupManager, ret)
+	err := q.First(ret)
+	if err != nil {
+		return nil, err
 	}
 	return ret, nil
 }

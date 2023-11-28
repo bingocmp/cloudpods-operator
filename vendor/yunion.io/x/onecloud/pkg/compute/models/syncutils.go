@@ -19,10 +19,11 @@ import (
 
 	"yunion.io/x/cloudmux/pkg/cloudprovider"
 	"yunion.io/x/log"
-
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/cloudcommon/db"
 	"yunion.io/x/onecloud/pkg/mcclient"
+	"yunion.io/x/pkg/util/timeutils"
+	"yunion.io/x/pkg/utils"
 )
 
 type IMetadataSetter interface {
@@ -79,13 +80,34 @@ func syncVirtualResourceMetadata(ctx context.Context, userCred mcclient.TokenCre
 	model.SetSysCloudMetadataAll(ctx, sysStore, userCred)
 
 	tags, err := remote.GetTags()
-	if err == nil {
-		store := make(map[string]string, 0)
-		for key, value := range tags {
-			store[db.CLOUD_TAG_PREFIX+key] = value
-		}
-		model.SetCloudMetadataAll(ctx, store, userCred)
+	if err != nil {
+		return err
 	}
+
+	store := make(map[string]string, 0)
+	if guest, isOk := model.(*SGuest); isOk {
+		//保留userTag
+		userTag, _ := guest.GetAllUserMetadata()
+		//获取密码
+		if pwd, exist := tags["Password"]; exist {
+			info := make(map[string]interface{})
+			secret, _ := utils.EncryptAESBase64(guest.Id, pwd)
+			info["login_account"] = guest.GetDriver().GetDefaultAccount(guest.GetOS(), "", "")
+			info["login_key"] = secret
+			info["login_key_timestamp"] = timeutils.UtcNow()
+			guest.SetAllMetadata(ctx, info, userCred)
+			delete(tags, "Password")
+			remote.SetTags(tags, true)
+		}
+		for key, value := range userTag {
+			store[db.USER_TAG_PREFIX+key] = value
+		}
+	}
+	for key, value := range tags {
+		store[db.CLOUD_TAG_PREFIX+key] = value
+	}
+	model.SetCloudMetadataAll(ctx, store, userCred)
+
 	return nil
 }
 

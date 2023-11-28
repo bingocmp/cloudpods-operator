@@ -155,6 +155,8 @@ func (self *STablestore) syncRemoveCloudTablestore(ctx context.Context, userCred
 func (self *STablestore) SyncWithCloudTablestore(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudTablestore, provider *SCloudprovider) error {
 	diff, err := db.Update(self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName

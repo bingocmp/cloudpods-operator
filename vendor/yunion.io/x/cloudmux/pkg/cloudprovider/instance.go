@@ -104,15 +104,17 @@ type SDiskInfo struct {
 	Iops              int
 	Name              string
 	// aws gp3 only
-	Throughput int
+	Throughput         int
+	SnapshotExternalId string
 }
 
 type GuestDiskCreateOptions struct {
-	SizeMb    int
-	UUID      string
-	Driver    string
-	Idx       int
-	StorageId string
+	SizeMb        int
+	UUID          string
+	Driver        string
+	Idx           int
+	StorageId     string
+	Preallocation string `choices:"off|metadata|full|falloc"`
 }
 
 const (
@@ -151,8 +153,8 @@ type SManagedVMCreateConfig struct {
 	Description         string
 	SysDisk             SDiskInfo
 	DataDisks           []SDiskInfo
+	KeypairName         string
 	PublicKey           string
-	ExternalSecgroupId  string
 	ExternalSecgroupIds []string
 	Account             string
 	Password            string
@@ -174,6 +176,7 @@ type SManagedVMCreateConfig struct {
 
 type SManagedVMChangeConfig struct {
 	Cpu          int
+	CpuSocket    int
 	MemoryMB     int
 	InstanceType string
 }
@@ -334,6 +337,9 @@ type ServerVncOutput struct {
 	Host     string `json:"host"`
 	Protocol string `json:"protocol"`
 	Port     int64  `json:"port"`
+
+	// volcengine
+	Region string `json:"region"`
 
 	Url          string `json:"url"`
 	InstanceId   string `json:"instance_id"`

@@ -30,6 +30,7 @@ const (
 	CLOUD_CAPABILITY_PROJECT         = "project"
 	CLOUD_CAPABILITY_COMPUTE         = "compute"
 	CLOUD_CAPABILITY_NETWORK         = "network"
+	CLOUD_CAPABILITY_SECURITY_GROUP  = "security_group"
 	CLOUD_CAPABILITY_EIP             = "eip"
 	CLOUD_CAPABILITY_LOADBALANCER    = "loadbalancer"
 	CLOUD_CAPABILITY_OBJECTSTORE     = "objectstore"
@@ -56,6 +57,7 @@ const (
 	CLOUD_CAPABILITY_MODELARTES      = "modelarts"
 	CLOUD_CAPABILITY_VPC_PEER        = "vpcpeer" // 对等连接
 	CLOUD_CAPABILITY_MISC            = "misc"
+	CLOUD_CAPABILITY_CERT            = "sslcertificates" // 证书
 )
 
 const (

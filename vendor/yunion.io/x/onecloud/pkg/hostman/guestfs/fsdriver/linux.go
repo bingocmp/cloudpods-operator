@@ -55,8 +55,30 @@ const (
 )
 
 var (
-	NetDevPrefix = "eth"
+	NetDevPrefix   = "eth"
+	NetDevPrefixEN = "en"
 )
+
+func GetNetDevPrefix(nics []*types.SServerNic) string {
+	if NicsHasDifferentDriver(nics) {
+		return NetDevPrefixEN
+	} else {
+		return NetDevPrefix
+	}
+}
+
+func NicsHasDifferentDriver(nics []*types.SServerNic) bool {
+	m := make(map[string]int)
+	for i := 0; i < len(nics); i++ {
+		if _, ok := m[nics[i].Driver]; !ok {
+			m[nics[i].Driver] = 1
+		}
+	}
+	if len(m) > 1 {
+		return true
+	}
+	return false
+}
 
 type sLinuxRootFs struct {
 	*sGuestRootFsDriver
@@ -81,7 +103,13 @@ func getHostname(hostname, domain string) string {
 }
 
 func (l *sLinuxRootFs) DeployQgaBlackList(rootFs IDiskPartition) error {
-	etcSysconfigQemuga := "/etc/sysconfig/qemu-ga"
+	var modeRwxOwner = syscall.S_IRUSR | syscall.S_IWUSR | syscall.S_IXUSR
+	var qgaConfDir = "/etc/sysconfig"
+	var etcSysconfigQemuga = path.Join(qgaConfDir, "qemu-ga")
+
+	if err := rootFs.Mkdir(qgaConfDir, modeRwxOwner, false); err != nil {
+		return errors.Wrap(err, "mkdir qga conf dir")
+	}
 	blackListContent := `# This is a systemd environment file, not a shell script.
 # It provides settings for \"/lib/systemd/system/qemu-guest-agent.service\".
 
@@ -139,7 +167,7 @@ func (l *sLinuxRootFs) GetLoginAccount(rootFs IDiskPartition, sUser string, defa
 		return sUser, nil
 	}
 	var selUsr string
-	if defaultRootUser && rootFs.Exists("/root", false) {
+	if defaultRootUser && rootFs.Exists("/root", false) && l.GetIRootFsDriver().AllowAdminLogin() {
 		selUsr = ROOT_USER
 	} else {
 		usrs := rootFs.ListDir("/home", false)
@@ -168,6 +196,9 @@ func (l *sLinuxRootFs) ChangeUserPasswd(rootFs IDiskPartition, account, gid, pub
 		} else {
 			secret, err = utils.EncryptAESBase64(gid, password)
 		}
+		if err != nil {
+			return "", errors.Wrap(err, "Encryption")
+		}
 		// put /.autorelabel if selinux enabled
 		err = rootFs.FilePutContents("/.autorelabel", "", false, false)
 		if err != nil {
@@ -190,7 +221,13 @@ func (l *sLinuxRootFs) DeployPublicKey(rootFs IDiskPartition, selUsr string, pub
 }
 
 func (d *SCoreOsRootFs) DeployQgaBlackList(rootFs IDiskPartition) error {
-	etcSysconfigQemuga := "/etc/sysconfig/qemu-ga"
+	var modeRwxOwner = syscall.S_IRUSR | syscall.S_IWUSR | syscall.S_IXUSR
+	var qgaConfDir = "/etc/sysconfig"
+	var etcSysconfigQemuga = path.Join(qgaConfDir, "qemu-ga")
+
+	if err := rootFs.Mkdir(qgaConfDir, modeRwxOwner, false); err != nil {
+		return errors.Wrap(err, "mkdir qga conf dir")
+	}
 	blackListContent := `# This is a systemd environment file, not a shell script.
 # It provides settings for \"/lib/systemd/system/qemu-guest-agent.service\".
 
@@ -342,6 +379,9 @@ func (l *sLinuxRootFs) DeployFstabScripts(rootFs IDiskPartition, disks []*deploy
 }
 
 func (l *sLinuxRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*types.SServerNic) error {
+	netDevPrefix := GetNetDevPrefix(nics)
+	log.Infof("netdev prefix: %s", netDevPrefix)
+
 	udevPath := "/etc/udev/rules.d/"
 	if rootFs.Exists(udevPath, false) {
 		rules := rootFs.ListDir(udevPath, false)
@@ -361,7 +401,7 @@ func (l *sLinuxRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*ty
 			mac := nic.Mac
 			nicRules += fmt.Sprintf(`ATTR{address}=="%s", ATTR{type}=="1", `, strings.ToLower(mac))
 			idx := nic.Index
-			nicRules += fmt.Sprintf("NAME=\"%s%d\"\n", NetDevPrefix, idx)
+			nicRules += fmt.Sprintf("NAME=\"%s%d\"\n", netDevPrefix, idx)
 		}
 		if err := rootFs.FilePutContents(path.Join(udevPath, "70-persistent-net.rules"), nicRules, false, false); err != nil {
 			return err
@@ -416,6 +456,7 @@ func (l *sLinuxRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*ty
 }
 
 func (l *sLinuxRootFs) DeployStandbyNetworkingScripts(rootFs IDiskPartition, nics, nicsStandby []*types.SServerNic) error {
+	var netDevPrefix = GetNetDevPrefix(nicsStandby)
 	var udevPath = "/etc/udev/rules.d/"
 	var nicRules string
 	for _, nic := range nicsStandby {
@@ -425,7 +466,7 @@ func (l *sLinuxRootFs) DeployStandbyNetworkingScripts(rootFs IDiskPartition, nic
 			mac := nic.Mac
 			nicRules += fmt.Sprintf(`ATTR{address}=="%s", ATTR{type}=="1", `, strings.ToLower(mac))
 			idx := nic.Index
-			nicRules += fmt.Sprintf(`NAME="%s%d"\n`, NetDevPrefix, idx)
+			nicRules += fmt.Sprintf(`NAME="%s%d"\n`, netDevPrefix, idx)
 		}
 	}
 	if err := rootFs.FilePutContents(path.Join(udevPath, "70-persistent-net.rules"), nicRules, true, false); err != nil {
@@ -1157,6 +1198,10 @@ func (d *SUKylinRootfs) GetReleaseInfo(rootFs IDiskPartition) *deployapi.Release
 	return info
 }
 
+func (d *SUKylinRootfs) AllowAdminLogin() bool {
+	return false
+}
+
 type sRedhatLikeRootFs struct {
 	*sLinuxRootFs
 }
@@ -1209,13 +1254,14 @@ func (r *sRedhatLikeRootFs) DeployHostname(rootFs IDiskPartition, hn, domain str
 }
 
 func (r *sRedhatLikeRootFs) Centos5DeployNetworkingScripts(rootFs IDiskPartition, nics []*types.SServerNic) error {
+	var netDevPrefix = GetNetDevPrefix(nics)
 	var udevPath = "/etc/udev/rules.d/"
 	if rootFs.Exists(udevPath, false) {
 		var nicRules = ""
 		for _, nic := range nics {
 			nicRules += `KERNEL=="*", `
 			nicRules += fmt.Sprintf(`SYSFS{address}=="%s", `, strings.ToLower(nic.Mac))
-			nicRules += fmt.Sprintf("NAME=\"%s%d\"\n", NetDevPrefix, nic.Index)
+			nicRules += fmt.Sprintf("NAME=\"%s%d\"\n", netDevPrefix, nic.Index)
 		}
 		return rootFs.FilePutContents(path.Join(udevPath, "60-net.rules"),
 			nicRules, false, false)
@@ -1392,15 +1438,16 @@ func (r *sRedhatLikeRootFs) DeployStandbyNetworkingScripts(rootFs IDiskPartition
 	if err := r.sLinuxRootFs.DeployStandbyNetworkingScripts(rootFs, nics, nicsStandby); err != nil {
 		return err
 	}
+	var netDevPrefix = GetNetDevPrefix(nics)
 	for _, nic := range nicsStandby {
 		var cmds string
 		if len(nic.NicType) == 0 || nic.NicType != "ipmi" {
-			cmds += fmt.Sprintf("DEVICE=%s%d\n", NetDevPrefix, nic.Index)
-			cmds += fmt.Sprintf("NAME=%s%d\n", NetDevPrefix, nic.Index)
+			cmds += fmt.Sprintf("DEVICE=%s%d\n", netDevPrefix, nic.Index)
+			cmds += fmt.Sprintf("NAME=%s%d\n", netDevPrefix, nic.Index)
 			cmds += fmt.Sprintf("HWADDR=%s\n", nic.Mac)
 			cmds += fmt.Sprintf("MACADDR=%s\n", nic.Mac)
 			cmds += "ONBOOT=no\n"
-			var fn = fmt.Sprintf("/etc/sysconfig/network-scripts/ifcfg-%s%d", NetDevPrefix, nic.Index)
+			var fn = fmt.Sprintf("/etc/sysconfig/network-scripts/ifcfg-%s%d", netDevPrefix, nic.Index)
 			if err := rootFs.FilePutContents(fn, cmds, false, false); err != nil {
 				return err
 			}
@@ -1695,18 +1742,19 @@ func (l *SGentooRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*t
 		cmds = ""
 	)
 
+	var netDevPrefix = GetNetDevPrefix(nics)
 	// Ref https://wiki.gentoo.org/wiki/Netifrc
 	for _, nic := range nics {
 		nicIndex := nic.Index
 		if nic.Virtual {
-			cmds += fmt.Sprintf(`config_%s%d="`, NetDevPrefix, nicIndex)
+			cmds += fmt.Sprintf(`config_%s%d="`, netDevPrefix, nicIndex)
 			cmds += fmt.Sprintf("%s netmask 255.255.255.255", netutils2.PSEUDO_VIP)
 			cmds += `"\n`
 		} else {
-			cmds += fmt.Sprintf(`config_%s%d="dhcp"\n`, NetDevPrefix, nicIndex)
+			cmds += fmt.Sprintf(`config_%s%d="dhcp"\n`, netDevPrefix, nicIndex)
 		}
 		if nic.Mtu > 0 {
-			cmds += fmt.Sprintf(`mtu_%s%d="%d"\n`, NetDevPrefix, nicIndex, nic.Mtu)
+			cmds += fmt.Sprintf(`mtu_%s%d="%d"\n`, netDevPrefix, nicIndex, nic.Mtu)
 		}
 	}
 	if err := rootFs.FilePutContents(fn, cmds, false, false); err != nil {
@@ -1714,7 +1762,7 @@ func (l *SGentooRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*t
 	}
 	for _, nic := range nics {
 		nicIndex := nic.Index
-		netname := fmt.Sprintf("net.%s%d", NetDevPrefix, nicIndex)
+		netname := fmt.Sprintf("net.%s%d", netDevPrefix, nicIndex)
 		procutils.NewCommand("ln", "-s", "net.lo",
 			fmt.Sprintf("%s/etc/init.d/%s", rootFs.GetMountPath(), netname)).Run()
 		procutils.NewCommand("chroot",
@@ -1955,8 +2003,9 @@ func (d *SCoreOsRootFs) DeployHosts(rootFs IDiskPartition, hostname, domain stri
 }
 
 func (d *SCoreOsRootFs) DeployNetworkingScripts(rootFs IDiskPartition, nics []*types.SServerNic) error {
+	var netDevPrefix = GetNetDevPrefix(nics)
 	for _, nic := range nics {
-		name := fmt.Sprintf("%s%d", NetDevPrefix, nic.Index)
+		name := fmt.Sprintf("%s%d", netDevPrefix, nic.Index)
 		cont := "[Match]\n"
 		cont += "Name=" + name + "\n"
 		cont += "\n[Network]\n"

@@ -418,6 +418,8 @@ func (self *SKafka) syncRemoveCloudKafka(ctx context.Context, userCred mcclient.
 func (self *SKafka) SyncWithCloudKafka(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudKafka) error {
 	diff, err := db.UpdateWithLock(ctx, self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName

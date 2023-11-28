@@ -20,7 +20,8 @@ type ScriptApplyInput struct {
 	// description: server id
 	// required: true
 	// example: b48c5c84-9952-4394-8ca9-c3b84e946a03
-	ServerID string
+	ServerID          string
+	IsExternalMachine bool
 }
 
 type ScriptApplyOutput struct {
@@ -30,7 +31,8 @@ type ScriptApplyOutput struct {
 }
 
 type ScriptBatchApplyInput struct {
-	ServerIds []string
+	ServerIds         []string
+	IsExternalMachine bool
 }
 
 type ScriptBatchApplyOutput struct {

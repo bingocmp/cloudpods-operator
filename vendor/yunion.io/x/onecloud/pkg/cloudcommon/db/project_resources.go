@@ -58,10 +58,12 @@ func getAllScopeResourceCounts() (map[string][]SScopeResourceCount, error) {
 }
 
 type SScopeResourceCount struct {
-	TenantId string `json:"tenant_id"`
-	DomainId string `json:"domain_id"`
-	OwnerId  string `json:"owner_id"`
-	ResCount int    `json:"res_count"`
+	TenantId       string `json:"tenant_id"`
+	DomainId       string `json:"domain_id"`
+	OwnerId        string `json:"owner_id"`
+	ResCount       int    `json:"res_count"`
+	Resource       string `json:"name"`
+	ChildResources []SScopeResourceCount
 }
 
 type IResourceCountManager interface {

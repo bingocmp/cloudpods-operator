@@ -705,6 +705,7 @@ func (lbbg *SLoadbalancerBackendGroup) SyncWithCloudLoadbalancerBackendgroup(
 ) error {
 	diff, err := db.UpdateWithLock(ctx, lbbg, func() error {
 		lbbg.Type = ext.GetType()
+		lbbg.Name = ext.GetName()
 		lbbg.Status = ext.GetStatus()
 		return nil
 	})

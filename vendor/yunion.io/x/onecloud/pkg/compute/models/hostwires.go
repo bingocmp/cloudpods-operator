@@ -54,6 +54,7 @@ func init() {
 
 type SHostwireDeprecated struct {
 	SHostJointsBase
+	SManagedResourceBase
 
 	Bridge string `width:"64" charset:"ascii" nullable:"false" list:"domain" update:"domain" create:"domain_required"`
 	// 接口名称

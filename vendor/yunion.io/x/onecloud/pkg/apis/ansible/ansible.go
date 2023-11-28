@@ -16,7 +16,6 @@ package ansible
 
 import (
 	"yunion.io/x/jsonutils"
-
 	"yunion.io/x/onecloud/pkg/apis"
 	"yunion.io/x/onecloud/pkg/util/ansible"
 )
@@ -50,6 +49,7 @@ type AnsiblePlaybookReferenceUpdateInput struct {
 }
 
 type AnsiblePlaybookReferenceRunInput struct {
+	Sync bool
 	Host AnsibleHost
 	Args jsonutils.JSONObject
 }
@@ -65,4 +65,9 @@ type AnsiblePlaybookReferenceStopInput struct {
 type AnsiblePlaybookInstanceListInput struct {
 	apis.StatusStandaloneResourceListInput
 	AnsiblePlayboookReferenceId string
+}
+
+type AnsiblePlaybookInstanceDetails struct {
+	SAnsiblePlaybookInstance
+	Reference string
 }

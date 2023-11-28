@@ -16,6 +16,7 @@ package ansible
 
 import (
 	"bytes"
+	"fmt"
 )
 
 // Module represents name and args of ansible module to execute
@@ -74,7 +75,7 @@ func (i *Inventory) Data() []byte {
 			b.WriteRune(' ')
 			b.WriteString(k)
 			b.WriteRune('=')
-			b.WriteString(v)
+			b.WriteString(fmt.Sprintf(`"%s"`, v))
 		}
 		b.WriteRune('\n')
 	}

@@ -823,6 +823,7 @@ func (lblis *SLoadbalancerListener) constructFieldsFromCloudListener(userCred mc
 	lblis.EgressMbps = extListener.GetEgressMbps()
 	lblis.ListenerPort = extListener.GetListenerPort()
 	lblis.Status = extListener.GetStatus()
+	lblis.Name = extListener.GetName()
 
 	// default off
 	if extListener.GetAclStatus() == "" {

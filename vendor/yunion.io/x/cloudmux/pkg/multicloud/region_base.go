@@ -47,6 +47,10 @@ func (r *SRegion) GetISnapshots() ([]cloudprovider.ICloudSnapshot, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetISnapshots")
 }
 
+func (r *SRegion) GetISecurityGroups() ([]cloudprovider.ICloudSecurityGroup, error) {
+	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetISecurityGroups")
+}
+
 func (r *SRegion) GetIStorageById(id string) (cloudprovider.ICloudStorage, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetIStorageById")
 }
@@ -61,6 +65,10 @@ func (r *SRegion) GetIStoragecaches() ([]cloudprovider.ICloudStoragecache, error
 
 func (r *SRegion) GetIStorages() ([]cloudprovider.ICloudStorage, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetIStorages")
+}
+
+func (r *SRegion) GetIVMs() ([]cloudprovider.ICloudVM, error) {
+	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetIVMs")
 }
 
 func (r *SRegion) GetIVMById(id string) (cloudprovider.ICloudVM, error) {
@@ -362,10 +370,6 @@ func (self *SRegionSecurityGroupBase) GetISecurityGroupById(secgroupId string) (
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetISecurityGroupById")
 }
 
-func (self *SRegionSecurityGroupBase) GetISecurityGroupByName(opts *cloudprovider.SecurityGroupFilterOptions) (cloudprovider.ICloudSecurityGroup, error) {
-	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetISecurityGroupByName")
-}
-
 type SRegionEipBase struct {
 }
 
@@ -403,4 +407,8 @@ func (self *SRegion) GetIModelartsPoolSku() ([]cloudprovider.ICloudModelartsPool
 
 func (self *SRegion) GetIMiscResources() ([]cloudprovider.ICloudMiscResource, error) {
 	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetIMiscResources")
+}
+
+func (self *SRegion) GetISSLCertificates() ([]cloudprovider.ICloudSSLCertificate, error) {
+	return nil, errors.Wrapf(cloudprovider.ErrNotImplemented, "GetISSLCertificate")
 }

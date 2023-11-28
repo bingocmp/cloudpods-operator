@@ -455,6 +455,8 @@ func (fileSystem *SFileSystem) SyncAllWithCloudFileSystem(ctx context.Context, u
 func (fileSystem *SFileSystem) SyncWithCloudFileSystem(ctx context.Context, userCred mcclient.TokenCredential, fs cloudprovider.ICloudFileSystem) error {
 	diff, err := db.Update(fileSystem, func() error {
 		if options.Options.EnableSyncName {
+			fileSystem.Name = fs.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(fileSystem, fs.GetName())
 			if len(newName) > 0 {
 				fileSystem.Name = newName

@@ -255,7 +255,8 @@ func (self HostDetails) GetMetricTags() map[string]string {
 		"account_id":     self.AccountId,
 		"external_id":    self.ExternalId,
 	}
-	return ret
+
+	return AppendMetricTags(ret, self.MetadataResourceInfo)
 }
 
 func (self HostDetails) GetMetricPairs() map[string]string {
@@ -623,4 +624,7 @@ type HostLoginInfoOutput struct {
 	Ip       string `json:"ip"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type HostPerformStartInput struct {
 }

@@ -370,7 +370,7 @@ func (self CloudaccountDetail) GetMetricTags() map[string]string {
 		"project_domain":    self.ProjectDomain,
 		"currency":          self.Currency,
 	}
-	return ret
+	return AppendMetricTags(ret, self.MetadataResourceInfo, self.ProjectizedResourceInfo)
 }
 
 func (self CloudaccountDetail) GetMetricPairs() map[string]string {
@@ -521,6 +521,15 @@ type SubscriptonCreateInput struct {
 
 	// 可选值: MS-AZR-0017P(生产用途), MS-AZR-0148P(开发测试)
 	OfferType string `json:"offer_type"`
+
+	// 子账户ID
+	SubAccountId string `json:"sub_account_id"`
+
+	// 子账户名称
+	SubAccountName string `json:"sub_account_name"`
+
+	// 默认项目
+	DefaultProject string `json:"default_project"`
 }
 
 type EnrollmentAccountQuery struct {

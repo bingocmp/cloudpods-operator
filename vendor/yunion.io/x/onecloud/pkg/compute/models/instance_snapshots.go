@@ -442,10 +442,12 @@ func (manager *SInstanceSnapshotManager) CreateInstanceSnapshot(ctx context.Cont
 
 var HypervisorIndependentInstanceSnapshot = []string{
 	api.HYPERVISOR_KVM,
+	api.CLOUD_PROVIDER_BINGO_CLOUD,
 }
 
 var ProviderHasSubSnapshot = []string{
 	api.CLOUD_PROVIDER_ONECLOUD,
+	api.CLOUD_PROVIDER_BINGO_CLOUD,
 }
 
 func (self *SInstanceSnapshot) ToInstanceCreateInput(
@@ -499,6 +501,7 @@ func (self *SInstanceSnapshot) ToInstanceCreateInput(
 		sourceInput.Secgroups = inputSecgs
 	}
 	sourceInput.OsType = self.OsType
+	sourceInput.OsArch = self.OsArch
 	sourceInput.InstanceType = self.InstanceType
 	if len(sourceInput.Networks) == 0 {
 		sourceInput.Networks = serverConfig.Networks

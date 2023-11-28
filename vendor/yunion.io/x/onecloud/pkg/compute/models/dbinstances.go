@@ -755,8 +755,7 @@ func fetchDBInstanceZones(rdsIds []string) map[string][]sDBInstanceZone {
 }
 
 func (self *SDBInstance) getSecgroupsByExternalIds(externalIds []string) ([]SSecurityGroup, error) {
-	sq := SecurityGroupCacheManager.Query("secgroup_id").In("external_id", externalIds).Equals("manager_id", self.ManagerId)
-	q := SecurityGroupManager.Query().In("id", sq.SubQuery())
+	q := SecurityGroupManager.Query().In("external_id", externalIds).Equals("manager_id", self.ManagerId)
 	secgroups := []SSecurityGroup{}
 	err := db.FetchModelObjects(SecurityGroupManager, q, &secgroups)
 	if err != nil {
@@ -1655,6 +1654,8 @@ func (self *SDBInstance) SyncAllWithCloudDBInstance(ctx context.Context, userCre
 func (self *SDBInstance) SyncWithCloudDBInstance(ctx context.Context, userCred mcclient.TokenCredential, provider *SCloudprovider, ext cloudprovider.ICloudDBInstance) error {
 	diff, err := db.Update(self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName

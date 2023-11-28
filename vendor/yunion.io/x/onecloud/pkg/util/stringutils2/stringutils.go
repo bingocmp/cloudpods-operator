@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 func GetMD5Hash(text string) string {
@@ -233,4 +234,19 @@ func PrettyFloat(f float64, precision int) string {
 		ret = "-" + ret
 	}
 	return ret
+}
+
+func Camel2Case(name string) string {
+	var output []rune
+	for i, r := range name {
+		if i == 0 {
+			output = append(output, unicode.ToLower(r))
+		} else {
+			if unicode.IsUpper(r) {
+				output = append(output, '_')
+			}
+			output = append(output, unicode.ToLower(r))
+		}
+	}
+	return string(output)
 }

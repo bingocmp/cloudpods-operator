@@ -59,6 +59,8 @@ const (
 	ACT_VM_SRC_CHECK                 = "vm_src_check"
 	ACT_VM_START                     = "vm_start"
 	ACT_VM_STOP                      = "vm_stop"
+	ACT_VM_START_RESCUE              = "vm_start_rescue"
+	ACT_VM_STOP_RESCUE               = "vm_stop_rescue"
 	ACT_VM_SUSPEND                   = "vm_suspend"
 	ACT_VM_RESTART                   = "vm_restart"
 	ACT_VM_RESUME                    = "vm_resume"
@@ -269,4 +271,9 @@ const (
 	ACT_REPORT_COLLECT_DATA = "report_collect_data"
 	ACT_REPORT_SEND         = "report_send"
 	ACT_REPORT_TEMPLATE     = "report_template"
+
+	ACT_CREATE_SECURITY_GROUP_RULE = "create_security_group_rule"
+	ACT_DELETE_SECURITY_GROUP_RULE = "delete_security_group_rule"
+
+	ACT_CLEAN_PROJECT = "clean_project"
 )

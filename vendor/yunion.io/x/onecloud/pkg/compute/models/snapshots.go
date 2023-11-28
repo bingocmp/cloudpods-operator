@@ -531,7 +531,15 @@ func (snapshot *SSnapshot) PostCreate(ctx context.Context, userCred mcclient.Tok
 
 func (manager *SSnapshotManager) OnCreateComplete(ctx context.Context, items []db.IModel, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, query jsonutils.JSONObject, data []jsonutils.JSONObject) {
 	snapshot := items[0].(*SSnapshot)
-	snapshot.StartSnapshotCreateTask(ctx, userCred, nil, "")
+	params := jsonutils.NewDict()
+	if rootInfo, _ := data[0].Get("root_info"); rootInfo != nil {
+		params.Add(rootInfo, "root_info")
+	}
+	if storageId, _ := data[0].Get("storage_id"); storageId != nil {
+		id := snapshot.GetStorage().GetExternalId()
+		params.Add(jsonutils.NewString(id), "storage_id")
+	}
+	snapshot.StartSnapshotCreateTask(ctx, userCred, params, "")
 }
 
 func (self *SSnapshot) StartSnapshotCreateTask(ctx context.Context, userCred mcclient.TokenCredential, params *jsonutils.JSONDict, parentTaskId string) error {
@@ -679,9 +687,9 @@ func (self *SSnapshotManager) CreateSnapshot(ctx context.Context, owner mcclient
 	snapshot.ProjectId = owner.GetProjectId()
 	snapshot.DomainId = owner.GetProjectDomainId()
 	snapshot.DiskId = disk.Id
-	if len(disk.ExternalId) == 0 {
-		snapshot.StorageId = disk.StorageId
-	}
+	//if len(disk.ExternalId) == 0 {
+	snapshot.StorageId = disk.StorageId
+	//}
 
 	// inherit encrypt_key_id
 	snapshot.EncryptKeyId = disk.EncryptKeyId
@@ -977,6 +985,8 @@ func (self *SSnapshot) syncRemoveCloudSnapshot(ctx context.Context, userCred mcc
 func (self *SSnapshot) SyncWithCloudSnapshot(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudSnapshot, syncOwnerId mcclient.IIdentityProvider, region *SCloudregion) error {
 	diff, err := db.UpdateWithLock(ctx, self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName
@@ -1023,8 +1033,9 @@ func (manager *SSnapshotManager) newFromCloudSnapshot(ctx context.Context, userC
 		if err != nil {
 			log.Errorf("snapshot %s missing disk?", snapshot.Name)
 		} else {
-			snapshot.DiskId = disk.GetId()
 			localDisk = disk.(*SDisk)
+			snapshot.DiskId = localDisk.Id
+			snapshot.StorageId = localDisk.StorageId
 		}
 	}
 

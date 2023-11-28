@@ -500,6 +500,8 @@ func (self *SMongoDB) SyncAllWithCloudMongoDB(ctx context.Context, userCred mccl
 func (self *SMongoDB) SyncWithCloudMongoDB(ctx context.Context, userCred mcclient.TokenCredential, ext cloudprovider.ICloudMongoDB) error {
 	diff, err := db.UpdateWithLock(ctx, self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = ext.GetName()
+		} else {
 			newName, _ := db.GenerateAlterName(self, ext.GetName())
 			if len(newName) > 0 {
 				self.Name = newName

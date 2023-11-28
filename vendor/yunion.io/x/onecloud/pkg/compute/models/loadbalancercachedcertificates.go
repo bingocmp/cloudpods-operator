@@ -304,7 +304,7 @@ func (self *SCloudprovider) newFromCloudLoadbalancerCertificate(ctx context.Cont
 		c.CommonName = ext.GetCommonName()
 		c.SubjectAlternativeNames = ext.GetSubjectAlternativeNames()
 		c.NotAfter = ext.GetExpireTime()
-		c.PublicScope = string(rbacscope.ScopeDomain)
+		c.PublicScope = string(rbacscope.ScopeProject)
 		c.IsPublic = true
 
 		err := LoadbalancerCertificateManager.TableSpec().Insert(ctx, c)

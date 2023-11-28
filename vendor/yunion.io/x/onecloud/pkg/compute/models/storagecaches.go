@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/serialx/hashring"
+	"yunion.io/x/onecloud/pkg/compute/options"
 
 	"yunion.io/x/cloudmux/pkg/cloudprovider"
 	"yunion.io/x/jsonutils"
@@ -241,11 +242,15 @@ func (manager *SStoragecacheManager) newFromCloudStoragecache(ctx context.Contex
 		lockman.LockRawObject(ctx, manager.Keyword(), "name")
 		defer lockman.ReleaseRawObject(ctx, manager.Keyword(), "name")
 
-		newName, err := db.GenerateName(ctx, manager, userCred, cloudCache.GetName())
-		if err != nil {
-			return err
+		if options.Options.EnableSyncName {
+			local.Name = cloudCache.GetName()
+		} else {
+			newName, err := db.GenerateName(ctx, manager, userCred, cloudCache.GetName())
+			if err != nil {
+				return err
+			}
+			local.Name = newName
 		}
-		local.Name = newName
 
 		return manager.TableSpec().Insert(ctx, &local)
 	}()
@@ -342,14 +347,23 @@ func (self *SStoragecache) getCachedImageList(excludeIds []string, imageType str
 	return images
 }
 
-func (self *SStoragecache) getCachedImages() ([]SStoragecachedimage, error) {
+func (self *SStoragecache) getCachedImagesByManager(managerId string) ([]SStoragecachedimage, error) {
 	images := make([]SStoragecachedimage, 0)
 	q := StoragecachedimageManager.Query().Equals("storagecache_id", self.Id)
+	if managerId != "" {
+		subq := CachedimageManager.Query().Equals("manager_id", managerId).SubQuery()
+		q = q.Join(subq, sqlchemy.Equals(q.Field("cachedimage_id"), subq.Field("id")))
+	}
+
 	err := db.FetchModelObjects(StoragecachedimageManager, q, &images)
 	if err != nil {
 		return nil, errors.Wrapf(err, "db.FetchModelObjects")
 	}
 	return images, nil
+}
+
+func (self *SStoragecache) getCachedImages() ([]SStoragecachedimage, error) {
+	return self.getCachedImagesByManager("")
 }
 
 func (self *SStoragecache) getCustomdCachedImages() ([]SStoragecachedimage, error) {
@@ -676,12 +690,7 @@ func (cache *SStoragecache) syncCloudImages(
 ) compare.SyncResult {
 	syncResult := compare.SyncResult{}
 
-	var syncOwnerId mcclient.IIdentityProvider
-
 	provider := cache.GetCloudprovider()
-	if provider != nil {
-		syncOwnerId = provider.GetOwnerId()
-	}
 
 	removed := make([]SStoragecachedimage, 0)
 	commondb := make([]SStoragecachedimage, 0)
@@ -703,7 +712,7 @@ func (cache *SStoragecache) syncCloudImages(
 	}
 	if !xor {
 		for i := 0; i < len(commondb); i += 1 {
-			err = commondb[i].syncWithCloudImage(ctx, userCred, syncOwnerId, commonext[i], cache.ManagerId)
+			err = commondb[i].syncWithCloudImage(ctx, userCred, provider.GetOwnerId(), commonext[i], provider.GetId())
 			if err != nil {
 				syncResult.UpdateError(err)
 			} else {
@@ -712,7 +721,7 @@ func (cache *SStoragecache) syncCloudImages(
 		}
 	}
 	for i := 0; i < len(added); i += 1 {
-		err = StoragecachedimageManager.newFromCloudImage(ctx, userCred, syncOwnerId, added[i], cache)
+		err = StoragecachedimageManager.newFromCloudImage(ctx, userCred, provider, added[i], cache)
 		if err != nil {
 			syncResult.AddError(err)
 		} else {

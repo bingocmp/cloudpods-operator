@@ -24,6 +24,7 @@ import (
 	"yunion.io/x/pkg/util/billing"
 	"yunion.io/x/pkg/util/rbacscope"
 	"yunion.io/x/pkg/util/samlutils"
+	"yunion.io/x/pkg/util/secrules"
 )
 
 type ICloudResource interface {
@@ -79,13 +80,16 @@ type ICloudRegion interface {
 	GetIVpcById(id string) (ICloudVpc, error)
 	GetIZoneById(id string) (ICloudZone, error)
 	GetIEipById(id string) (ICloudEIP, error)
+	// ICoudVM 的 GetGlobalId 接口不能panic
+	GetIVMs() ([]ICloudVM, error)
 	// Esxi没有zone，需要通过region确认vm是否被删除
 	GetIVMById(id string) (ICloudVM, error)
 	GetIDiskById(id string) (ICloudDisk, error)
 
+	// 仅返回region级别的安全组, vpc下面的安全组需要在ICloudVpc底下返回
+	GetISecurityGroups() ([]ICloudSecurityGroup, error)
 	GetISecurityGroupById(secgroupId string) (ICloudSecurityGroup, error)
-	GetISecurityGroupByName(opts *SecurityGroupFilterOptions) (ICloudSecurityGroup, error)
-	CreateISecurityGroup(conf *SecurityGroupCreateInput) (ICloudSecurityGroup, error)
+	CreateISecurityGroup(opts *SecurityGroupCreateInput) (ICloudSecurityGroup, error)
 
 	CreateIVpc(opts *VpcCreateOptions) (ICloudVpc, error)
 	CreateInternetGateway() (ICloudInternetGateway, error)
@@ -342,6 +346,7 @@ type ICloudVM interface {
 
 	GetSerialOutput(port int) (string, error) // 目前仅谷歌云windows机器会使用到此接口
 
+	GetCpuSockets() int
 	GetVcpuCount() int
 	GetVmemSizeMB() int //MB
 	GetBootOrder() string
@@ -357,12 +362,9 @@ type ICloudVM interface {
 	GetInstanceType() string
 
 	GetSecurityGroupIds() ([]string, error)
-	AssignSecurityGroup(secgroupId string) error
 	SetSecurityGroups(secgroupIds []string) error
 
 	GetHypervisor() string
-
-	// GetSecurityGroup() ICloudSecurityGroup
 
 	StartVM(ctx context.Context) error
 	StopVM(ctx context.Context, opts *ServerStopOptions) error
@@ -469,10 +471,26 @@ type ICloudSecurityGroup interface {
 
 	GetDescription() string
 	// 返回的优先级字段(priority)要求数字越大优先级越高, 若有默认不可修改的allow规则依然需要返回
-	GetRules() ([]SecurityRule, error)
+	GetRules() ([]ISecurityGroupRule, error)
 	GetVpcId() string
 
+	CreateRule(opts *SecurityGroupRuleCreateOptions) (ISecurityGroupRule, error)
+
 	GetReferences() ([]SecurityGroupReference, error)
+	Delete() error
+}
+
+type ISecurityGroupRule interface {
+	GetGlobalId() string
+	GetDirection() secrules.TSecurityRuleDirection
+	GetPriority() int
+	GetAction() secrules.TSecurityRuleAction
+	GetProtocol() string
+	GetPorts() string
+	GetDescription() string
+	GetCIDRs() []string
+
+	Update(opts *SecurityGroupRuleUpdateOptions) error
 	Delete() error
 }
 
@@ -533,6 +551,8 @@ type ICloudDisk interface {
 	Reset(ctx context.Context, snapshotId string) (string, error)
 
 	Rebuild(ctx context.Context) error
+
+	GetPreallocation() string
 }
 
 type ICloudSnapshot interface {
@@ -562,6 +582,9 @@ type ICloudSnapshotPolicy interface {
 
 type ICloudGlobalVpc interface {
 	ICloudResource
+
+	GetISecurityGroups() ([]ICloudSecurityGroup, error)
+	CreateISecurityGroup(opts *SecurityGroupCreateInput) (ICloudSecurityGroup, error)
 
 	Delete() error
 }
@@ -1660,4 +1683,23 @@ type ICloudMiscResource interface {
 	GetResourceType() string
 
 	GetConfig() jsonutils.JSONObject
+}
+
+type ICloudSSLCertificate interface {
+	IVirtualResource
+
+	GetSans() string
+	GetStartDate() time.Time
+	GetProvince() string
+	GetCommon() string
+	GetCountry() string
+	GetIssuer() string
+	GetExpired() bool
+	GetEndDate() time.Time
+	GetFingerprint() string
+	GetCity() string
+	GetOrgName() string
+	GetIsUpload() bool
+	GetCert() string
+	GetKey() string
 }

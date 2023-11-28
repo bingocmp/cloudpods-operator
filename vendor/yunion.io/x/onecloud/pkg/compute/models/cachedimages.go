@@ -47,6 +47,7 @@ import (
 type SCachedimageManager struct {
 	db.SSharableVirtualResourceBaseManager
 	db.SExternalizedResourceBaseManager
+	SManagedResourceBaseManager
 }
 
 var CachedimageManager *SCachedimageManager
@@ -67,6 +68,7 @@ func init() {
 type SCachedimage struct {
 	db.SSharableVirtualResourceBase
 	db.SExternalizedResourceBase
+	SManagedResourceBase
 
 	// 镜像大小单位: Byte
 	// example: 53687091200
@@ -140,6 +142,23 @@ func (self *SCachedimage) isRefreshSessionExpire() bool {
 	} else {
 		return true
 	}
+}
+
+func (self *SCachedimage) GetHosts() ([]SHost, error) {
+	q := HostManager.Query().Distinct()
+	hs := HoststorageManager.Query().SubQuery()
+	storages := StorageManager.Query().SubQuery()
+	scis := StoragecachedimageManager.Query().Equals("cachedimage_id", self.Id).Equals("status", api.CACHED_IMAGE_STATUS_ACTIVE).SubQuery()
+
+	q = q.Join(hs, sqlchemy.Equals(hs.Field("host_id"), q.Field("id")))
+	q = q.Join(storages, sqlchemy.Equals(hs.Field("storage_id"), storages.Field("id")))
+	q = q.Join(scis, sqlchemy.Equals(storages.Field("storagecache_id"), scis.Field("storagecache_id")))
+	ret := []SHost{}
+	err := db.FetchModelObjects(HostManager, q, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return ret, err
 }
 
 func (self *SCachedimage) GetName() string {
@@ -612,6 +631,8 @@ func (self *SCachedimage) canDeleteLastCache() bool {
 func (self *SCachedimage) syncWithCloudImage(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, image cloudprovider.ICloudImage, managerId string) error {
 	diff, err := db.UpdateWithLock(ctx, self, func() error {
 		if options.Options.EnableSyncName {
+			self.Name = image.GetName()
+		} else {
 			newName, err := db.GenerateAlterName(self, image.GetName())
 			if err != nil {
 				return errors.Wrap(err, "GenerateAlterName")
@@ -623,6 +644,7 @@ func (self *SCachedimage) syncWithCloudImage(ctx context.Context, userCred mccli
 		self.ImageType = string(image.GetImageType())
 		self.PublicScope = string(image.GetPublicScope())
 		self.Status = image.GetStatus()
+		self.ManagerId = managerId
 		if image.GetPublicScope() == rbacscope.ScopeSystem {
 			self.IsPublic = true
 		}
@@ -638,10 +660,11 @@ func (self *SCachedimage) syncWithCloudImage(ctx context.Context, userCred mccli
 	return err
 }
 
-func (manager *SCachedimageManager) newFromCloudImage(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, image cloudprovider.ICloudImage, managerId string) (*SCachedimage, error) {
+func (manager *SCachedimageManager) newFromCloudImage(ctx context.Context, userCred mcclient.TokenCredential, provider *SCloudprovider, image cloudprovider.ICloudImage) (*SCachedimage, error) {
 	cachedImage := SCachedimage{}
 	cachedImage.SetModelManager(manager, &cachedImage)
 
+	cachedImage.ManagerId = provider.Id
 	cachedImage.Size = image.GetSizeByte()
 	cachedImage.UEFI = tristate.NewFromBool(cloudprovider.IsUEFI(image))
 	sImage := cloudprovider.CloudImage2Image(image)
@@ -672,7 +695,7 @@ func (manager *SCachedimageManager) newFromCloudImage(ctx context.Context, userC
 		return nil, err
 	}
 
-	SyncCloudProject(ctx, userCred, &cachedImage, ownerId, image, managerId)
+	SyncCloudProject(ctx, userCred, &cachedImage, provider.GetOwnerId(), image, provider.Id)
 
 	return &cachedImage, nil
 }
@@ -821,6 +844,11 @@ func (manager *SCachedimageManager) ListItemFilter(
 	q, err = manager.SExternalizedResourceBaseManager.ListItemFilter(ctx, q, userCred, query.ExternalizedResourceBaseListInput)
 	if err != nil {
 		return nil, errors.Wrap(err, "SExternalizedResourceBaseManager.ListItemFilter")
+	}
+
+	q, err = manager.SManagedResourceBaseManager.ListItemFilter(ctx, q, userCred, query.ManagedResourceListInput)
+	if err != nil {
+		return nil, errors.Wrap(err, "SManagedResourceBaseManager.ListItemFilter")
 	}
 
 	{

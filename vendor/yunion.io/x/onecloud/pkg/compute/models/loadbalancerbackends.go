@@ -581,7 +581,7 @@ func (lbbg *SLoadbalancerBackendGroup) SyncLoadbalancerBackends(ctx context.Cont
 }
 
 func (lbb *SLoadbalancerBackend) constructFieldsFromCloudLoadbalancerBackend(ext cloudprovider.ICloudLoadbalancerBackend, managerId string) error {
-	// lbb.Name = extLoadbalancerBackend.GetName()
+	lbb.Name = ext.GetName()
 	lbb.Status = ext.GetStatus()
 
 	lbb.Weight = ext.GetWeight()
@@ -590,7 +590,7 @@ func (lbb *SLoadbalancerBackend) constructFieldsFromCloudLoadbalancerBackend(ext
 	lbb.BackendType = ext.GetBackendType()
 	lbb.BackendRole = ext.GetBackendRole()
 
-	if lbb.BackendType == api.LB_BACKEND_IP {
+	if lbb.BackendType == api.LB_BACKEND_IP || lbb.BackendType == api.LB_BACKEND_NETWORK_INTERFACE {
 		lbb.Address = ext.GetIpAddress()
 	} else {
 		instance, err := db.FetchByExternalIdAndManagerId(GuestManager, ext.GetBackendId(), func(q *sqlchemy.SQuery) *sqlchemy.SQuery {

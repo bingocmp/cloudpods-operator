@@ -152,6 +152,10 @@ func (manager *SModelBaseManager) EnableGenerateName() bool {
 	return true
 }
 
+func (manager *SModelBaseManager) AllowDuplicateName() bool {
+	return false
+}
+
 func (manager *SModelBaseManager) HasName() bool {
 	return false
 }
@@ -684,6 +688,10 @@ func (model *SModelBase) PostDelete(ctx context.Context, userCred mcclient.Token
 func (model *SModelBase) MarkDelete() error {
 	// do nothing
 	return nil
+}
+
+func (model *SModelBase) MarkPendingDeleted() {
+	return
 }
 
 func (model *SModelBase) Delete(ctx context.Context, userCred mcclient.TokenCredential) error {

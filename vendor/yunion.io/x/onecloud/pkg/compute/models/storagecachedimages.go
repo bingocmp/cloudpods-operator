@@ -419,9 +419,11 @@ func (self *SStoragecachedimage) syncWithCloudImage(ctx context.Context, userCre
 	}
 }
 
-func (manager *SStoragecachedimageManager) newFromCloudImage(ctx context.Context, userCred mcclient.TokenCredential, ownerId mcclient.IIdentityProvider, image cloudprovider.ICloudImage, cache *SStoragecache) error {
+func (manager *SStoragecachedimageManager) newFromCloudImage(ctx context.Context, userCred mcclient.TokenCredential, provider *SCloudprovider, image cloudprovider.ICloudImage, cache *SStoragecache) error {
 	var cachedImage *SCachedimage
-	imgObj, err := db.FetchByExternalId(CachedimageManager, image.GetGlobalId())
+	imgObj, err := db.FetchByExternalIdAndManagerId(CachedimageManager, image.GetGlobalId(), func(q *sqlchemy.SQuery) *sqlchemy.SQuery {
+		return q.Equals("manager_id", provider.Id)
+	})
 	if err != nil {
 		if err != sql.ErrNoRows {
 			// unhandled error
@@ -442,7 +444,7 @@ func (manager *SStoragecachedimageManager) newFromCloudImage(ctx context.Context
 		}
 		if cachedImage == nil {
 			// no such image
-			cachedImage, err = CachedimageManager.newFromCloudImage(ctx, userCred, ownerId, image, cache.ManagerId)
+			cachedImage, err = CachedimageManager.newFromCloudImage(ctx, userCred, provider, image)
 			if err != nil {
 				log.Errorf("CachedimageManager.newFromCloudImage fail %s", err)
 				return err
@@ -452,7 +454,7 @@ func (manager *SStoragecachedimageManager) newFromCloudImage(ctx context.Context
 		cachedImage = imgObj.(*SCachedimage)
 	}
 	if len(cachedImage.ExternalId) > 0 {
-		cachedImage.syncWithCloudImage(ctx, userCred, ownerId, image, cache.ManagerId)
+		cachedImage.syncWithCloudImage(ctx, userCred, provider.GetOwnerId(), image, provider.GetId())
 	}
 	scimg := manager.Register(ctx, userCred, cache.GetId(), cachedImage.GetId(), image.GetStatus())
 	if scimg == nil {

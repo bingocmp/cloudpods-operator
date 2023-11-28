@@ -53,6 +53,7 @@ import (
 type SCloudproviderManager struct {
 	db.SEnabledStatusStandaloneResourceBaseManager
 	db.SProjectizedResourceBaseManager
+	db.SExternalizedResourceBaseManager
 
 	SProjectMappingResourceBaseManager
 	SSyncableBaseResourceManager
@@ -75,6 +76,7 @@ func init() {
 type SCloudprovider struct {
 	db.SEnabledStatusStandaloneResourceBase
 	db.SProjectizedResourceBase
+	db.SExternalizedResourceBase
 
 	SSyncableBaseResource
 
@@ -96,14 +98,16 @@ type SCloudprovider struct {
 	// Version string `width:"32" charset:"ascii" nullable:"true" list:"domain"` // Column(VARCHAR(32, charset='ascii'), nullable=True)
 	// Sysinfo jsonutils.JSONObject `get:"domain"` // Column(JSONEncodedDict, nullable=True)
 
-	AccessUrl string `width:"64" charset:"ascii" nullable:"true" list:"domain" update:"domain" create:"domain_optional"`
+	AccessUrl string `width:"128" charset:"ascii" nullable:"true" list:"domain" update:"domain" create:"domain_optional"`
 	// 云账号的用户信息，例如用户名，access key等
-	Account string `width:"128" charset:"ascii" nullable:"false" list:"domain" create:"domain_required"`
+	Account string `width:"256" charset:"ascii" nullable:"false" list:"domain" create:"domain_required"`
 	// 云账号的密码信息，例如密码，access key secret等。该字段在数据库加密存储。Google需要存储秘钥证书,需要此字段比较长
 	Secret string `length:"0" charset:"ascii" nullable:"false" list:"domain" create:"domain_required"`
 
 	// 归属云账号ID
 	CloudaccountId string `width:"36" charset:"ascii" nullable:"false" list:"user" create:"required"`
+
+	IsSubAccount tristate.TriState `default:"false" list:"domain" create:"optional"`
 
 	// ProjectId string `name:"tenant_id" width:"128" charset:"ascii" nullable:"true" list:"domain"`
 
@@ -111,6 +115,10 @@ type SCloudprovider struct {
 
 	// 云账号的平台信息
 	Provider string `width:"64" charset:"ascii" list:"domain" create:"domain_required"`
+
+	// 云上同步资源是否在本地被更改过配置, local: 更改过, cloud: 未更改过
+	// example: local
+	ProjectSrc string `width:"10" charset:"ascii" nullable:"false" list:"user" default:"cloud" json:"project_src"`
 
 	SProjectMappingResourceBase
 }
@@ -467,14 +475,18 @@ func (cprvd *SCloudprovider) syncProject(ctx context.Context, userCred mcclient.
 		return errors.Wrap(err, "getOrCreateTenant")
 	}
 
-	return cprvd.saveProject(userCred, domainId, projectId)
+	return cprvd.saveProject(userCred, domainId, projectId, true)
 }
 
-func (cprvd *SCloudprovider) saveProject(userCred mcclient.TokenCredential, domainId, projectId string) error {
+func (cprvd *SCloudprovider) saveProject(userCred mcclient.TokenCredential, domainId, projectId string, auto bool) error {
 	if projectId != cprvd.ProjectId {
 		diff, err := db.Update(cprvd, func() error {
 			cprvd.DomainId = domainId
 			cprvd.ProjectId = projectId
+			// 自动改变项目时不改变配置，仅在performChangeOnwer（手动更改项目）时改变
+			if !auto {
+				cprvd.ProjectSrc = string(apis.OWNER_SOURCE_LOCAL)
+			}
 			return nil
 		})
 		if err != nil {
@@ -742,7 +754,7 @@ func (cprvd *SCloudprovider) PerformChangeProject(ctx context.Context, userCred 
 		NewDomain:    tenant.Domain,
 	}
 
-	err = cprvd.saveProject(userCred, tenant.DomainId, tenant.Id)
+	err = cprvd.saveProject(userCred, tenant.DomainId, tenant.Id, false)
 	if err != nil {
 		log.Errorf("Update cloudprovider error: %v", err)
 		return nil, httperrors.NewGeneralError(err)
@@ -818,7 +830,7 @@ func (cprvd *SCloudprovider) markEndSyncWithLock(ctx context.Context, userCred m
 			return nil
 		}
 
-		if cprvd.getSyncStatus2() != api.CLOUD_PROVIDER_SYNC_STATUS_IDLE {
+		if cprvd.GetSyncStatus2() != api.CLOUD_PROVIDER_SYNC_STATUS_IDLE {
 			return nil
 		}
 
@@ -892,7 +904,8 @@ func (cprvd *SCloudprovider) GetProvider(ctx context.Context) (cloudprovider.ICl
 		return nil, errors.Wrapf(err, "GetCloudaccount")
 	}
 	defaultRegion, _ := jsonutils.Marshal(account.Options).GetString("default_region")
-	return cloudprovider.GetProvider(cloudprovider.ProviderConfig{
+
+	providerConfig := cloudprovider.ProviderConfig{
 		Id:        cprvd.Id,
 		Name:      cprvd.Name,
 		Vendor:    cprvd.Provider,
@@ -909,7 +922,33 @@ func (cprvd *SCloudprovider) GetProvider(ctx context.Context) (cloudprovider.ICl
 		Options:       account.Options,
 
 		UpdatePermission: account.UpdatePermission(ctx),
-	})
+	}
+
+	managerCloudprovider := CloudproviderManager.FetchManagerCloudproviderByAccount(cprvd.CloudaccountId)
+	if managerCloudprovider != nil {
+		accessUrl = managerCloudprovider.getAccessUrl()
+		passwd, err = managerCloudprovider.getPassword()
+		if err != nil {
+			return nil, err
+		}
+		mProviderConfig := &cloudprovider.ProviderConfig{
+			Id:                     managerCloudprovider.Id,
+			Name:                   managerCloudprovider.Name,
+			Vendor:                 managerCloudprovider.Provider,
+			URL:                    accessUrl,
+			Account:                managerCloudprovider.Account,
+			Secret:                 passwd,
+			ProxyFunc:              account.proxyFunc(),
+			AliyunResourceGroupIds: options.Options.AliyunResourceGroups,
+			ReadOnly:               account.ReadOnly,
+			DefaultRegion:          defaultRegion,
+			Options:                account.Options,
+			UpdatePermission:       account.UpdatePermission(ctx),
+		}
+		providerConfig.ManagerProviderConfig = mProviderConfig
+	}
+
+	return cloudprovider.GetProvider(providerConfig)
 }
 
 func (cprvd *SCloudprovider) savePassword(secret string) error {
@@ -1333,6 +1372,10 @@ func (manager *SCloudproviderManager) ListItemFilter(
 	if err != nil {
 		return nil, errors.Wrap(err, "SSyncableBaseResourceManager.ListItemFilter")
 	}
+	q, err = manager.SExternalizedResourceBaseManager.ListItemFilter(ctx, q, userCred, query.ExternalizedResourceBaseListInput)
+	if err != nil {
+		return nil, errors.Wrap(err, "SExternalizedResourceBaseManager.ListItemFilter")
+	}
 
 	managerStrs := query.CloudproviderId
 	conditions := []sqlchemy.ICondition{}
@@ -1459,14 +1502,18 @@ func (manager *SCloudproviderManager) QueryDistinctExtraField(q *sqlchemy.SQuery
 
 func (provider *SCloudprovider) markProviderDisconnected(ctx context.Context, userCred mcclient.TokenCredential, reason string) error {
 	_, err := db.UpdateWithLock(ctx, provider, func() error {
+		//provider.SetEnabled(false)
 		provider.HealthStatus = api.CLOUD_PROVIDER_HEALTH_UNKNOWN
 		return nil
 	})
 	if err != nil {
 		return err
 	}
-	provider.SetStatus(userCred, api.CLOUD_PROVIDER_DISCONNECTED, reason)
-	return provider.ClearSchedDescCache()
+	if provider.Status != api.CLOUD_PROVIDER_DISCONNECTED {
+		provider.SetStatus(userCred, api.CLOUD_PROVIDER_DISCONNECTED, reason)
+		return provider.ClearSchedDescCache()
+	}
+	return nil
 }
 
 func (cprvd *SCloudprovider) updateName(ctx context.Context, userCred mcclient.TokenCredential, name, desc string) error {
@@ -1542,6 +1589,23 @@ func (provider *SCloudprovider) GetRegions() ([]SCloudregion, error) {
 	q = q.Join(crcp, sqlchemy.Equals(q.Field("id"), crcp.Field("cloudregion_id"))).Filter(sqlchemy.Equals(crcp.Field("cloudprovider_id"), provider.Id))
 	ret := []SCloudregion{}
 	return ret, db.FetchModelObjects(CloudregionManager, q, &ret)
+}
+
+func (provider *SCloudprovider) GetUsableRegions() ([]SCloudregion, error) {
+	q := CloudregionManager.Query()
+	crcp := CloudproviderRegionManager.Query().SubQuery()
+	q = q.Join(crcp, sqlchemy.Equals(q.Field("id"), crcp.Field("cloudregion_id"))).Filter(
+		sqlchemy.AND(
+			sqlchemy.Equals(crcp.Field("cloudprovider_id"), provider.Id),
+			sqlchemy.IsTrue(crcp.Field("enabled")),
+		),
+	)
+	ret := []SCloudregion{}
+	err := db.FetchModelObjects(CloudregionManager, q, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (provider *SCloudprovider) resetAutoSync() {
@@ -1749,7 +1813,7 @@ func (manager *SCloudproviderManager) FilterByOwner(q *sqlchemy.SQuery, man db.F
 	return q
 }
 
-func (cprvd *SCloudprovider) getSyncStatus2() string {
+func (cprvd *SCloudprovider) GetSyncStatus2() string {
 	q := CloudproviderRegionManager.Query()
 	q = q.Equals("cloudprovider_id", cprvd.Id)
 	q = q.NotEquals("sync_status", api.CLOUD_PROVIDER_SYNC_STATUS_IDLE)
@@ -1772,6 +1836,16 @@ func (manager *SCloudproviderManager) fetchRecordsByQuery(q *sqlchemy.SQuery) []
 		return nil
 	}
 	return recs
+}
+
+func (manager *SCloudproviderManager) FetchManagerCloudproviderByAccount(cloudAccountId string) *SCloudprovider {
+	providers := manager.fetchRecordsByQuery(CloudproviderManager.Query().Equals("cloudaccount_id", cloudAccountId).IsFalse("is_sub_account"))
+
+	//TODO 理论上主账号只有1个
+	if len(providers) == 1 {
+		return &providers[0]
+	}
+	return nil
 }
 
 func (manager *SCloudproviderManager) initAllRecords() {
@@ -2186,4 +2260,9 @@ func (cprvd *SCloudaccount) SyncError(result compare.SyncResult, iNotes interfac
 	if result.IsError() {
 		logclient.AddSimpleActionLog(cprvd, logclient.ACT_CLOUD_SYNC, iNotes, userCred, false)
 	}
+}
+
+func (manager *SCloudproviderManager) GetResourceCount() ([]db.SScopeResourceCount, error) {
+	q := manager.Query().IsFalse("deleted")
+	return db.CalculateResourceCount(q, "tenant_id")
 }

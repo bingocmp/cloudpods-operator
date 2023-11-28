@@ -56,6 +56,7 @@ type IModelManager interface {
 	HasName() bool
 	ValidateName(name string) error
 	EnableGenerateName() bool
+	AllowDuplicateName() bool
 
 	// list hooks
 	// AllowListItems(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject) bool
@@ -282,6 +283,7 @@ type IStandaloneModel interface {
 	// GetExternalId() string
 
 	SetName(name string)
+	MarkPendingDeleted()
 
 	StandaloneModelManager() IStandaloneModelManager
 
