@@ -184,7 +184,15 @@ func (conn *Connection) Grant(username string, password string, database string,
 	if database == "" {
 		database = "*"
 	}
-	_, err := conn.db.Exec(fmt.Sprintf("GRANT ALL ON `%s`.* to '%s'@'%s' IDENTIFIED BY '%s'", database, username, address, password))
+	createUser := fmt.Sprintf("CREATE USER IF NOT EXISTS '%s'@'%s' IDENTIFIED BY '%s'",
+		username, address, password)
+	_, err := conn.db.Exec(createUser)
+	if err != nil {
+		return err
+	}
+	grant := fmt.Sprintf("GRANT ALL PRIVILEGES ON %s.* TO '%s'@'%s'",
+		database, username, address)
+	_, err = conn.db.Exec(grant)
 	return err
 }
 
