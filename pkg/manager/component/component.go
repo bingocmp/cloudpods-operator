@@ -1540,6 +1540,10 @@ func (m *ComponentManager) EChartsSSR() manager.Manager {
 	return newEChartsSSR(m)
 }
 
+func (m *ComponentManager) GeneralService() manager.Manager {
+	return newGeneralServiceManager(m)
+}
+
 func (m *ComponentManager) HostHealth() manager.Manager {
 	return newHostHealthManager(m)
 }

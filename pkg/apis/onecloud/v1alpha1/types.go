@@ -147,6 +147,8 @@ const (
 
 	BastionHostComponentType ComponentType = "bastionhost"
 	CloudmuxComponentType    ComponentType = "cloudmux"
+
+	GeneralServiceComponentType ComponentType = "generalservice"
 )
 
 // ComponentPhase is the current state of component
@@ -325,7 +327,8 @@ type OnecloudClusterSpec struct {
 	BastionHost DeploymentServicePortSpec `json:"bastionHost"`
 
 	// Cloudmux holds configuration for cloudmux
-	Cloudmux CloudmuxSpec `json:"cloudmux"`
+	Cloudmux       CloudmuxSpec              `json:"cloudmux"`
+	GeneralService DeploymentServicePortSpec `json:"generalService"`
 }
 
 // OnecloudClusterStatus describes cluster status
@@ -368,6 +371,7 @@ type OnecloudClusterStatus struct {
 	Report          DeploymentStatus     `json:"report,omitempty"`
 	ECharts         DeploymentStatus     `json:"echarts,omitempty"`
 	BastionHost     DeploymentStatus     `json:"bastionHost,omitempty"`
+	GeneralService  DeploymentStatus     `json:"generalservice,omitempty"`
 }
 
 type EtcdClusterSpec struct {
@@ -1163,4 +1167,5 @@ type OnecloudClusterConfig struct {
 	Report          ServiceDBCommonOptions `json:"report"`
 	Grafana         GrafanaConfig          `json:"grafana"`
 	BastionHost     ServiceDBCommonOptions `json:"bastionHost"`
+	GeneralService  ServiceDBCommonOptions `json:"generalservice"`
 }

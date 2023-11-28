@@ -422,6 +422,13 @@ const (
 	BastionHostPort         = 30983
 	BastionHostDB           = "bastionhost"
 	BastionHostDBUser       = "bastionhost"
+
+	ServiceNameGeneralService = "generalservice"
+	ServiceTypeGeneralService = "generalservice"
+	GeneralServiceAdminUser   = "generalservice"
+	GeneralServicePort        = 30886
+	GeneralServiceDB          = "generalservice"
+	GeneralServiceDBUser      = "generalservice"
 )
 
 var (
