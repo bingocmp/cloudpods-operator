@@ -324,9 +324,10 @@ const (
 	ServiceNameCommon = "common"
 	ServiceTypeCommon = ServiceNameCommon
 
-	ServiceNameOfflineCloudmeta = "offlinecloudmeta"
-	ServiceTypeOfflineCloudmeta = "offlinecloudmeta"
-	ServiceURLOfflineCloudmeta  = "https://yunionmeta.oss-cn-beijing.aliyuncs.com"
+	ServiceNameOfflineCloudmeta        = "offlinecloudmeta"
+	ServiceTypeOfflineCloudmeta        = "offlinecloudmeta"
+	ServiceURLPublicOfflineCloudmeta   = "https://yunionmeta.oss-cn-beijing.aliyuncs.com"
+	ServiceURLInternalOfflineCloudmeta = "http://minio.onecloud-minio:9000/cloudmetas"
 
 	ServiceNameS3gateway  = "s3gateway"
 	ServiceTypeS3gateway  = "s3gateway"

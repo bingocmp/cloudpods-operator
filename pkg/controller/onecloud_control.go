@@ -683,6 +683,7 @@ func doRegisterCloudMeta(s *mcclient.ClientSession, regionId string) error {
 		constants.ServiceNameCloudmeta,
 		constants.ServiceTypeCloudmeta,
 		"",
+		constants.ServiceURLCloudmeta,
 		constants.ServiceURLCloudmeta)
 }
 
@@ -692,6 +693,7 @@ func doRegisterTracker(s *mcclient.ClientSession, regionId string) error {
 		constants.ServiceNameTorrentTracker,
 		constants.ServiceTypeTorrentTracker,
 		"",
+		constants.ServiceURLTorrentTracker,
 		constants.ServiceURLTorrentTracker)
 }
 
@@ -770,7 +772,8 @@ func doRegisterOfflineCloudMeta(s *mcclient.ClientSession, regionId string) erro
 		constants.ServiceNameOfflineCloudmeta,
 		constants.ServiceTypeOfflineCloudmeta,
 		"",
-		constants.ServiceURLOfflineCloudmeta)
+		constants.ServiceURLPublicOfflineCloudmeta,
+		constants.ServiceURLInternalOfflineCloudmeta)
 }
 
 type regionComponent struct {

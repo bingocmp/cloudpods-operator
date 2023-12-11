@@ -470,10 +470,22 @@ func RegisterServicePublicInternalEndpoint(
 	serviceName string,
 	serviceType string,
 	serviceCert string,
-	endpointUrl string,
+	publicEndpointUrl string,
+	internalEndpointUrl string,
 ) error {
+	if internalEndpointUrl == "" {
+		internalEndpointUrl = publicEndpointUrl
+	}
+	if publicEndpointUrl == "" {
+		publicEndpointUrl = internalEndpointUrl
+	}
+	err := RegisterServiceEndpointByInterfaces(s, regionId, serviceName, serviceType,
+		publicEndpointUrl, serviceCert, []string{constants.EndpointTypePublic})
+	if err != nil {
+		return nil
+	}
 	return RegisterServiceEndpointByInterfaces(s, regionId, serviceName, serviceType,
-		endpointUrl, serviceCert, []string{constants.EndpointTypeInternal, constants.EndpointTypePublic})
+		internalEndpointUrl, serviceCert, []string{constants.EndpointTypeInternal})
 }
 
 func ToPlaybook(
