@@ -1222,6 +1222,7 @@ func (manager *SStorageManager) totalCapacityQ(
 		storages.Field("cmtbound"),
 		storages.Field("storage_type"),
 		storages.Field("medium_type"),
+		storages.Field("external_id"),
 		stmt.Field("used_capacity"),
 		stmt.Field("used_count"),
 		stmt2.Field("failed_capacity"),
@@ -1253,6 +1254,7 @@ type StorageStat struct {
 	AttachedCount        int
 	DetachedUsedCapacity int
 	DetachedCount        int
+	ExternalId           string
 }
 
 type StoragesCapacityStat struct {
@@ -1320,13 +1322,16 @@ func (manager *SStorageManager) calculateCapacity(q *sqlchemy.SQuery) StoragesCa
 		s[storageType] += capa
 		return m, s
 	}
+	var processed []string
 	for _, stat := range stats {
-		tCapa += int64(stat.Capacity - stat.Reserved)
+		if !stringutils2.ContainsItem(processed, stat.ExternalId) {
+			tCapa += int64(stat.Capacity - stat.Reserved)
+			tVCapa += float64(stat.Capacity-stat.Reserved) * float64(stat.Cmtbound)
+			mCapa, sCapa = add(mCapa, sCapa, stat.MediumType, stat.StorageType, int64(stat.Capacity-stat.Reserved))
+		}
 		if stat.Cmtbound == 0 {
 			stat.Cmtbound = options.Options.DefaultStorageOvercommitBound
 		}
-		mCapa, sCapa = add(mCapa, sCapa, stat.MediumType, stat.StorageType, int64(stat.Capacity-stat.Reserved))
-		tVCapa += float64(stat.Capacity-stat.Reserved) * float64(stat.Cmtbound)
 		mCapaUsed, sCapaUsed = add(mCapaUsed, sCapaUsed, stat.MediumType, stat.StorageType, int64(stat.UsedCapacity))
 		tUsed += int64(stat.UsedCapacity)
 		cUsed += stat.UsedCount
@@ -1339,6 +1344,7 @@ func (manager *SStorageManager) calculateCapacity(q *sqlchemy.SQuery) StoragesCa
 		dtCapa += int64(stat.DetachedUsedCapacity)
 		mdtCapa, sdtCapa = add(mdtCapa, sdtCapa, stat.MediumType, stat.StorageType, int64(stat.DetachedUsedCapacity))
 		dtCount += stat.DetachedCount
+		processed = append(processed, stat.ExternalId)
 	}
 	return StoragesCapacityStat{
 		Capacity:                    tCapa,

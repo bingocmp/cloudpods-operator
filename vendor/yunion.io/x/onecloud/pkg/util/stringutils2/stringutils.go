@@ -250,3 +250,12 @@ func Camel2Case(name string) string {
 	}
 	return string(output)
 }
+
+func ContainsItem(slice []string, item string) bool {
+	for _, value := range slice {
+		if value == item {
+			return true
+		}
+	}
+	return false
+}

@@ -1590,17 +1590,6 @@ func (hh *SHost) GetGuestsQuery() *sqlchemy.SQuery {
 	return GuestManager.Query().Equals("host_id", hh.Id)
 }
 
-func (hh *SHost) GetGuestsByProvider(managerId string) ([]SGuest, error) {
-	q := hh.GetGuestsQuery()
-	q = q.Equals("manager_id", managerId)
-	guests := make([]SGuest, 0)
-	err := db.FetchModelObjects(GuestManager, q, &guests)
-	if err != nil {
-		return nil, errors.Wrapf(err, "db.FetchModelObjects")
-	}
-	return guests, nil
-}
-
 func (hh *SHost) GetGuests() ([]SGuest, error) {
 	q := hh.GetGuestsQuery()
 	guests := make([]SGuest, 0)
@@ -2821,6 +2810,7 @@ func (manager *SHostManager) totalCountQ(
 		hosts.Field("cpu_reserved"),
 		hosts.Field("cpu_cmtbound"),
 		hosts.Field("storage_size"),
+		hosts.Field("external_id"),
 	)
 	if scope != rbacscope.ScopeSystem && userCred != nil {
 		q = q.Filter(sqlchemy.Equals(hosts.Field("domain_id"), userCred.GetProjectDomainId()))
@@ -2883,6 +2873,7 @@ type HostStat struct {
 	IsolatedReservedMemory  int64
 	IsolatedReservedCpu     int64
 	IsolatedReservedStorage int64
+	ExternalId              string
 }
 
 type HostsCountStat struct {
@@ -2930,8 +2921,10 @@ func (manager *SHostManager) calculateCount(q *sqlchemy.SQuery) HostsCountStat {
 	if err != nil {
 		log.Errorf("%v", err)
 	}
+
+	var processed []string
 	for _, stat := range stats {
-		if stat.MemSize == 0 {
+		if stat.MemSize == 0 || stringutils2.ContainsItem(processed, stat.ExternalId) {
 			continue
 		}
 		tCnt += 1
@@ -2956,6 +2949,7 @@ func (manager *SHostManager) calculateCount(q *sqlchemy.SQuery) HostsCountStat {
 		irMem += stat.IsolatedReservedMemory
 		irCpu += stat.IsolatedReservedCpu
 		irStore += stat.IsolatedReservedStorage
+		processed = append(processed, stat.ExternalId)
 	}
 	return HostsCountStat{
 		StorageSize:             tStore,
@@ -3085,11 +3079,12 @@ type SHostGuestResourceUsage struct {
 }
 
 func (hh *SHost) getGuestsResource(status string) *SHostGuestResourceUsage {
+	hosts := HostManager.Query("id").Equals("external_id", hh.ExternalId)
 	guests := GuestManager.Query().SubQuery()
 	q := guests.Query(sqlchemy.COUNT("guest_count"),
 		sqlchemy.SUM("guest_vcpu_count", guests.Field("vcpu_count")),
 		sqlchemy.SUM("guest_vmem_size", guests.Field("vmem_size")))
-	cond := sqlchemy.OR(sqlchemy.Equals(q.Field("host_id"), hh.Id),
+	cond := sqlchemy.OR(sqlchemy.In(q.Field("host_id"), hosts.SubQuery()),
 		sqlchemy.Equals(q.Field("backup_host_id"), hh.Id))
 	q = q.Filter(cond)
 	if len(status) > 0 {

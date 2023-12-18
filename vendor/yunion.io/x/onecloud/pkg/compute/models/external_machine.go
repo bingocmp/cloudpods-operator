@@ -58,21 +58,21 @@ type SExternalMachine struct {
 	MemSize int `nullable:"false" default:"2048" list:"user" update:"user" create:"required"`
 
 	// 操作系统类型
-	OsType string `width:"36" charset:"ascii" nullable:"true" list:"user" update:"user" create:"optional"`
+	OsType string `width:"36" nullable:"true" list:"user" update:"user" create:"optional"`
 
 	Project string `width:"100" nullable:"true" list:"user" update:"user"`
 
 	Domain string `width:"100" nullable:"true" list:"user" update:"user"`
 
-	IpAddr string `width:"36" charset:"ascii" nullable:"true" list:"user" update:"user" create:"optional"`
+	IpAddr string `width:"36" nullable:"true" list:"user" update:"user" create:"optional"`
 
 	Port int `nullable:"false" default:"22" list:"user" update:"user" create:"required"`
 
-	MachineConfig string `width:"4000" nullable:"true" list:"user" update:"user" create:"optional"`
+	MachineConfig *jsonutils.JSONDict `get:"user" nullable:"true" list:"user" update:"user" create:"optional"`
 
-	UserName string `width:"36" charset:"ascii" nullable:"false" list:"user" update:"user" create:"required"`
+	UserName string `width:"36" nullable:"false" list:"user" update:"user" create:"required"`
 
-	Password string `width:"36" charset:"ascii" nullable:"false" list:"user" update:"user" create:"required"`
+	Password string `width:"36" nullable:"false" list:"user" update:"user" create:"required"`
 }
 
 func (manager *SExternalMachineManager) FetchCustomizeColumns(ctx context.Context, userCred mcclient.TokenCredential, query jsonutils.JSONObject, objs []interface{}, fields stringutils2.SSortedStrings, isList bool) []api.ExternalMachineDetails {
